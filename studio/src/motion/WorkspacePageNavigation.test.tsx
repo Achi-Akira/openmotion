@@ -149,6 +149,25 @@ it('restores template details from a copied link and closes back to the originat
   expect(container.querySelector('#mcp-title')?.textContent).toContain('Claude Code');
 });
 
+it('keeps an MCP showcase selection in the URL through history and reloads', async () => {
+  await mount(); await click('MCP · Connect Agent'); await click('Claude Code');
+  const draft = container.querySelector<HTMLInputElement>('[aria-label="Editor draft"]');
+  await click('Preview template Product Promo');
+  expect(page()).toMatchObject({ templates: true, template: 'product-promo', settings: 'mcp', client: 'claude' });
+  expect(container.querySelector('dialog[aria-label="Template preview"] h2')?.textContent).toBe('Product Promo');
+  await traverse(-1);
+  expect(page()).toMatchObject({ templates: false, template: null, settings: 'mcp', client: 'claude' });
+  expect(container.querySelector('dialog[aria-label="Template library"]')).toBeNull();
+  expect(container.querySelector('[aria-label="Editor draft"]')).toBe(draft);
+  expect(editor.mounts).toBe(1);
+  await traverse(1);
+  expect(container.querySelector('dialog[aria-label="Template preview"] h2')?.textContent).toBe('Product Promo');
+  await mount(1);
+  expect(container.querySelector('dialog[aria-label="Template preview"] h2')?.textContent).toBe('Product Promo');
+  await click('Close template preview'); await click('Close template library');
+  expect(page()).toMatchObject({ templates: false, template: null, settings: 'mcp', client: 'claude' });
+});
+
 it('restores a rejected project history entry without losing the later Forward destination', async () => {
   await mount(); await click('MCP · Connect Agent'); await click('Back to home');
   await click('Second project');

@@ -30,7 +30,7 @@ type WorkspaceChrome = {
   workspace: ReturnType<typeof useWorkspace>;
   switchingDisabled: boolean;
   saveState: string;
-  openLibrary: (trigger?: HTMLElement) => void;
+  openLibrary: (trigger?: HTMLElement, templateId?: string) => void;
   openConnections: () => void;
   openModelSettings: () => void;
   openHome: () => void;
@@ -154,7 +154,7 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
   const visibleNotice = notice && dismissedNotice !== noticeKey;
   if (!notice && dismissedNotice !== null) setDismissedNotice(null);
   const value: WorkspaceChrome = { workspace, switchingDisabled, saveState: editorState?.saveState || saveState, registerEditor, beforeViewChange,
-    openLibrary: trigger => { libraryTrigger.current = trigger ?? null; workspace.clearError(); navigatePage({ templates: true }); },
+    openLibrary: (trigger, templateId) => { libraryTrigger.current = trigger ?? null; workspace.clearError(); navigatePage({ templates: true, template: templateId ?? null }); },
     openConnections: () => openSettings('mcp'),
     openModelSettings: () => openSettings('providers'),
     openHome, toggleSidebar, sidebarOpen, navigationCollapsed,
@@ -192,7 +192,7 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
         {children}
       </div>
       {settings && <SettingsSurfaceBoundary key={settings}>{settings === 'mcp'
-        ? <McpConnectionPage openLibrary={value.openLibrary} openProviders={value.openModelSettings} route={page} onRouteChange={navigatePage} />
+        ? <McpConnectionPage previewsEnabled={!connectionsOpen} openLibrary={value.openLibrary} openProviders={value.openModelSettings} route={page} onRouteChange={navigatePage} />
         : <SettingsCenter navigationCollapsed={navigationCollapsed} section={settings} onSection={openSettings} openConnections={value.openConnections} providerId={page.provider} onProviderChange={provider => navigatePage({ provider })} />}</SettingsSurfaceBoundary>}
       </div>
     </div>
