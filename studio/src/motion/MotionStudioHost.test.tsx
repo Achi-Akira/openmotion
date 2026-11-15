@@ -103,6 +103,7 @@ it('keeps project switching, templates, history actions and native export in the
   expect(header.querySelector('.motion-workspace-menu')).toBeNull();
   expect(header.querySelector<HTMLInputElement>('[aria-label="项目名称"]')?.value).toBe('Demo');
   expect(container.querySelectorAll('[aria-label="项目名称"]')).toHaveLength(1);
+  expect(container.querySelector('.om-app-project-title > svg')).toBeNull();
   expect(container.querySelector('.om-app-header [aria-label="项目名称"]')).toBeNull();
   openSidebar();
   const project = document.querySelector<HTMLButtonElement>('.motion-session[title="Second"]')!;

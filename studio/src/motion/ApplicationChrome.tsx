@@ -11,6 +11,7 @@ import { GitHubLink } from './GitHubLink';
 import { repositorySupportLinks } from './githubRepository';
 import type { SettingsSection } from './SettingsCenter';
 import type { ReactNode } from 'react';
+import type { MouseEvent } from 'react';
 
 export function ApplicationHeader({ settings }: { settings: SettingsSection | null }) {
   const { t } = useI18n();
@@ -25,10 +26,10 @@ export function ApplicationRail({ settings, openSettings, home }: { settings: Se
   const { t, locale, setLocale } = useI18n(), { account } = useAccountSummary();
   const { openLibrary, openConnections, switchingDisabled, navigationCollapsed } = useWorkspaceChrome();
   const userName = account?.user?.name || account?.user?.email || t('Account');
-  const item = (label: string, icon: string, action: () => void, active = false, disabled = false) => <Tooltip label={t(label)} side="right"><button className="om-nav-item om-rail-button" aria-label={t(label)} aria-pressed={active} onClick={action} disabled={disabled}><RemixIcon name={icon} size={18} /></button></Tooltip>;
+  const item = (label: string, icon: string, action: (event: MouseEvent<HTMLButtonElement>) => void, active = false, disabled = false) => <Tooltip label={t(label)} side="right"><button className="om-nav-item om-rail-button" aria-label={t(label)} aria-pressed={active} onClick={action} disabled={disabled}><RemixIcon name={icon} size={18} /></button></Tooltip>;
   return <nav id="om-application-navigation" className="om-app-rail om-collapsible" aria-label={t('Application navigation')} aria-hidden={navigationCollapsed} inert={navigationCollapsed}>
     {home}
-    {item('Template library', 'clapperboard-line', () => openLibrary(), false, switchingDisabled)}
+    {item('Template library', 'apps-2-line', event => openLibrary(event.currentTarget), false, switchingDisabled)}
     {item('MCP · Connect Agent', 'plug-line', openConnections, settings === 'mcp')}
     <div className="om-rail-spacer" />
     {item('Help', 'question-line', () => openSettings('help'), settings === 'help')}
