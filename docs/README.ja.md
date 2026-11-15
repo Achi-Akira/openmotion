@@ -42,6 +42,12 @@ OpenMotion は、**エージェントが動画制作の全工程を担う初の�
 
 <a id="快速开始"></a> <a id="quick-start"></a>
 
+### ChatGPT Marketplace からインストール
+
+**ワンクリックでインストール。手動設定は不要です。** インストール後は、会話の中でモーション動画をゼロから作成したり、参考動画を再現したり、テンプレートから制作を始めたりできます。
+
+**[ChatGPT に OpenMotion をインストール →](https://chatgpt.com/plugins/plugins_6a742d13e88481919b42002864b1bb26)**
+
 <a id="start-in-codex"></a>
 
 ### エージェントでインストール

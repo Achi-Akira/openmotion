@@ -42,6 +42,12 @@ OpenMotion is **the first full-stack agentic video generator**. Upload a referen
 
 <a id="快速开始"></a> <a id="quick-start"></a>
 
+### Install from ChatGPT Marketplace
+
+**One-click installation. No manual configuration required.** Once installed, create motion videos from scratch, recreate reference videos, or start from a template—all in your conversation.
+
+**[Install OpenMotion in ChatGPT →](https://chatgpt.com/plugins/plugins_6a742d13e88481919b42002864b1bb26)**
+
 <a id="start-in-codex"></a>
 
 ### Install in your agent
