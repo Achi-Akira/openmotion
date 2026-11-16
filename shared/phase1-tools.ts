@@ -3,7 +3,7 @@ import { publicToolName, legacyToolName } from './public-names.mjs';
 import { templateDiscoveryGuide } from './workflow-entry.js';
 import { projectArchiveTool } from './project-archive.ts';
 import { projectManagementTool } from './project-management.ts';
-import { assetLibraryTool, assetUseTool } from './asset-tools.ts';
+import { assetLibraryTool, workspaceAssetUseTool } from './asset-tools.ts';
 const id = { type: 'string', minLength: 1, maxLength: 100 };
 const projectId = { type: 'string', pattern: '^(project|[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12})$' };
 const workId = { type: 'string', pattern: '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$' };
@@ -19,7 +19,7 @@ const display = object({ revision, versionId: id, previewUrl: { type: 'string', 
 const read = { readOnlyHint: true, openWorldHint: false };
 const write = { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 export const phase1Tools = [
-  assetUseTool,
+  workspaceAssetUseTool,
   assetLibraryTool,
   projectArchiveTool,
   projectManagementTool,
