@@ -24,7 +24,7 @@ export function ApplicationHeader({ settings }: { settings: SettingsSection | nu
       <Tooltip label={t('Back to home')}><button type="button" className="om-nav-item om-app-brand" onClick={openHome} aria-label={t('Back to home')}><BrandLogo compact /></button></Tooltip>
     </div>
     <div className="om-app-navigation">{settings ? <button className="om-nav-item" onClick={openHome} aria-label={t('Back to home')}><RemixIcon name="arrow-left-line" size={16} /><span>{t('Back to home')}</span></button> : null}</div>
-    <div className="om-app-header-actions"><div className="om-app-header-links"><CommunityLink /><GitHubLink /></div>{!settings && <ModelSwitcher openSettings={openModelSettings} />}{settings && <Tooltip label={t('Close settings')}><button className="motion-icon-button" aria-label={t('Close settings')} onClick={openHome}><RemixIcon name="close-line" size={20} /></button></Tooltip>}</div>
+    <div className="om-app-header-actions"><div className="om-app-header-links"><CommunityLink /><GitHubLink /></div>{!settings && <ModelSwitcher openSettings={openModelSettings} />}{settings && <button className="motion-icon-button" aria-label={t('Close settings')} onClick={openHome}><RemixIcon name="close-line" size={20} /></button>}</div>
   </header>;
 }
 export function ApplicationRail({ settings, openSettings, home }: { settings: SettingsSection | null; openSettings: (section: SettingsSection) => void; home: ReactNode }) {
@@ -41,7 +41,7 @@ export function ApplicationRail({ settings, openSettings, home }: { settings: Se
     {item('Help', 'question-line', () => openSettings('help'), settings === 'help')}
     {item('Settings', 'settings-3-line', () => openSettings('general'), Boolean(settings && !['mcp', 'providers', 'help', 'account', 'subscription'].includes(settings)))}
     {item('Model providers', 'sparkling-line', () => openSettings('providers'), settings === 'providers')}
-    <Menu modal={false} side="top" align="start" aria-label={t('Account menu')} className="om-account-menu om-selection-panel om-menu-panel" trigger={<button className="om-nav-item om-rail-button om-account-trigger" aria-current={settings === 'account' || settings === 'subscription' ? 'page' : undefined} aria-label={t('Account menu')}><span className="om-avatar">{account?.state === 'signed-in' ? userName.slice(0, 2).toUpperCase() : <RemixIcon name="user-3-line" size={18} />}</span></button>}>
+    <Menu modal={false} side="top" align="start" aria-label={t('Account menu')} className="om-account-menu om-selection-panel om-menu-panel" trigger={<button className="om-nav-item om-rail-button om-account-trigger" aria-current={settings === 'account' || settings === 'subscription' ? 'page' : undefined} aria-label={t('Account menu')} title={t('Account menu')}><span className="om-avatar">{account?.state === 'signed-in' ? userName.slice(0, 2).toUpperCase() : <RemixIcon name="user-3-line" size={18} />}</span></button>}>
       <MenuItem onClick={() => openSettings('account')}><span className="om-menu-label"><RemixIcon name="user-3-line" size={16} /><strong>{userName}</strong></span></MenuItem><MenuSeparator />
       <MenuItem onClick={() => openSettings('subscription')}><span className="om-menu-label"><RemixIcon name="bank-card-line" size={16} />{t('Subscription & usage')}</span></MenuItem>
       <MenuSeparator />

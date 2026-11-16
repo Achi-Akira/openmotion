@@ -195,6 +195,7 @@ function WorkspaceSidebar({ currentId, close, expand, query, setQuery, onNavigat
   return <aside className="motion-sidebar" aria-label={t('Workspace navigation')}>
     <div className="motion-sidebar-brand">
       <strong className="om-subtitle">{t('Home')}</strong>
+      {/* Collapsing the docked navigation toggles it back with the workspace menu button, so this icon-only control keeps a state-aware tooltip in both states. */}
       <button type="button" className="motion-icon-button" onClick={expand ?? close} aria-expanded={!expand} aria-controls="om-project-navigation" aria-label={t(expand ? 'Open project list' : 'Close project list')} title={t(expand ? 'Open project list' : 'Close project list')}><MotionIcon name="sidebar" size={16} /></button>
     </div>
     <div className="motion-session-heading">
@@ -232,5 +233,7 @@ export function WorkspaceMenuButton() {
   const { t } = useI18n();
   const { toggleSidebar, sidebarOpen, navigationCollapsed } = useWorkspaceChrome();
   const visible = sidebarOpen && !navigationCollapsed;
+  // Collapsing the docked navigation is a toggle, not a dismiss, so the icon-only
+  // control keeps its tooltip in both states like the app-sidebar toggle.
   return <button className="motion-icon-button motion-workspace-menu" onClick={toggleSidebar} aria-expanded={visible} title={t(visible ? 'Collapse project list' : 'Open project list')} aria-label={t(visible ? 'Collapse project list' : 'Open project list')}><MotionIcon name="sidebar" size={16} /></button>;
 }
