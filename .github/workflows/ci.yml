@@ -138,6 +138,37 @@ jobs:
           npm run typecheck:studio
           npm run typecheck:backend
 
+  platform-reliability:
+    name: Workspace reliability (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      OPENMOTION_TELEMETRY: '0'
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '26.11.1'
+          cache: npm
+      - name: Select checks for the changed boundary
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: node .github/scripts/ci-scope.mjs
+      - name: Install locked dependencies
+        if: steps.scope.outputs.full == 'true'
+        run: npm ci --no-audit --no-fund
+      - name: Check ownership recovery, read verification and immutable snapshots
+        if: steps.scope.outputs.full == 'true'
+        run: node --experimental-strip-types --test tests/process-lock.test.ts tests/version-reads.test.ts
+
   studio:
     name: Studio regression (${{ matrix.shard }}/2)
     env:
@@ -339,7 +370,7 @@ jobs:
   # Keep the existing required check while every independent lane runs in parallel.
   standalone:
     if: ${{ always() }}
-    needs: [template-library, maintainability, checks, studio, distribution]
+    needs: [template-library, maintainability, checks, platform-reliability, studio, distribution]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -350,7 +381,7 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           const results = JSON.parse(process.env.VALIDATION_RESULTS);
-          for (const job of ['template-library', 'maintainability', 'checks', 'studio', 'distribution']) {
+          for (const job of ['template-library', 'maintainability', 'checks', 'platform-reliability', 'studio', 'distribution']) {
             const result = results[job]?.result;
             const expected = job === 'maintainability' && process.env.ALLOW_SKIPPED_MAINTAINABILITY === 'true'
               ? 'skipped' : 'success';
