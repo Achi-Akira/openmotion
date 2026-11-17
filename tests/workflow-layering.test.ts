@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { getWorkflow, readWorkflowResource, workflowDocumentAliases, workflowReferences } from '../shared/workflow.ts';
 
 test('legacy director resources return the shared body while references use production identity', async () => {
@@ -16,9 +17,19 @@ test('legacy director resources return the shared body while references use prod
     assert.deepEqual(previous.references, current.references);
     const linked = workflowReferences(`[legacy](../openmotion-director/references/${legacy.split('/').at(-1)})`, 'skills/openmotion-recreate/SKILL.md');
     assert.deepEqual(linked, [{ workflow: 'production', section, documentId: canonical }]);
-    const forwarding = await readFile(new URL('../' + legacy, import.meta.url), 'utf8');
-    assert.deepEqual(workflowReferences(forwarding, legacy), linked);
-    assert.ok(!forwarding.includes(current.content), 'Old local paths must not maintain another rule body');
+    await assert.rejects(readFile(new URL('../' + legacy, import.meta.url), 'utf8'), { code: 'ENOENT' }, 'Old local paths must not keep a forwarding copy');
+  }
+});
+
+test('provider guides belong to the media Skill while older production resources return the same bodies', async () => {
+  for (const provider of ['account', 'compatible', 'fal', 'opendesign', 'atlascloud', 'wavespeed']) {
+    const current = await getWorkflow(provider, 'media');
+    const previous = JSON.parse((await readWorkflowResource(`openmotion://workflow/production/${provider}`, '/unused')).text);
+    assert.equal(current.documentId, `skills/openmotion-media/references/providers/${provider}.md`);
+    assert.equal(previous.documentId, current.documentId);
+    assert.equal(previous.contentHash, current.contentHash);
+    assert.deepEqual(workflowReferences(`[guide](references/providers/${provider}.md)`, 'skills/openmotion-media/SKILL.md'), [{ workflow: 'media', section: provider, documentId: current.documentId }]);
+    assert.doesNotMatch(current.content, /```bash|"projectId"/, `${provider} templates must use the asset Tool without shell wire examples`);
   }
 });
 
@@ -116,7 +127,7 @@ test('reference-video routes share one reading and measurement method and keep o
   for (const [workflow, sections] of routes) {
     for (const section of sections) {
       const document = await getWorkflow(section, workflow);
-      for (const phrase of ['navigation only', 'measure probe', 'Google Fonts', 'runtime/media/bin', 'one clip per object', 'mouse pointer with an inset']) {
+      for (const phrase of ['navigation only', 'measure probe', 'Google Fonts', 'runtime/media/bin', 'one clip per object', 'mouse pointer with an inset', 'never claim to have watched', 'never as passed', 'two consecutive fixes']) {
         assert.ok(!document.content.includes(phrase), `${workflow}/${section} repeats shared method: ${phrase}`);
       }
     }
@@ -129,4 +140,89 @@ test('reference-video routes share one reading and measurement method and keep o
     const row = context.content.split('\n').find(line => line.startsWith(request));
     assert.ok(row && workflowReferences(row, context.documentId).some(reference => reference.section === 'reference'), request);
   }
+});
+
+const skillRoot = new URL('../skills/', import.meta.url);
+const creativeEntries = ['openmotion-director', 'openmotion-recreate', 'openmotion-template-to-video', 'openmotion-video-to-template'];
+
+async function skillMarkdown() {
+  const { readdir } = await import('node:fs/promises');
+  const files = (await readdir(skillRoot, { recursive: true })).filter(file => file.endsWith('.md')).map(file => file.split('\\').join('/')).sort();
+  return Promise.all(files.map(async file => ({ file, text: await readFile(new URL(file, skillRoot), 'utf8') })));
+}
+
+const withoutCode = (text: string) => text.replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[^\n]*$/gm, ' ').replace(/`[^`\n]*`/g, ' ');
+
+test('the media Skill serves every entry without naming any of them', async () => {
+  for (const { file, text } of await skillMarkdown()) {
+    if (!file.startsWith('openmotion-media/')) continue;
+    assert.doesNotMatch(text, /openmotion-(?:director|recreate|template-to-video|video-to-template|reference-video)\b|workflow\/(?:director|recreate|template|video-to-template)\//, file);
+  }
+});
+
+test('an entry reaches another creative entry only through its SKILL.md', async () => {
+  const crossings: string[] = [];
+  for (const { file, text } of await skillMarkdown()) {
+    for (const [, target] of withoutCode(text).matchAll(/\]\(<?([^)\s>#]+)/g)) {
+      if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(target)) continue;
+      const resolved = path.posix.normalize(path.posix.join(path.posix.dirname(file), target));
+      const [owner] = file.split('/');
+      const [entry, ...rest] = resolved.split('/');
+      if (entry !== owner && creativeEntries.includes(entry) && rest.join('/') !== 'SKILL.md') crossings.push(`${file} -> ${resolved}`);
+    }
+  }
+  assert.deepEqual(crossings, []);
+});
+
+test('no long sentence is copied between Skill files', async () => {
+  // Chinese characters are paired so a twelve-token window covers a clause in either language.
+  const tokens = (text: string) => (withoutCode(text).replace(/\]\([^)]*\)/g, ']').match(/\p{Script=Han}+|[A-Za-z0-9_]+/gu) ?? [])
+    .flatMap(token => /\p{Script=Han}/u.test(token) ? token.match(/.{1,2}/gu)! : [token.toLowerCase()]);
+  const width = 12;
+  const seen = new Map<string, string>();
+  const copies = new Set<string>();
+  for (const { file, text } of await skillMarkdown()) {
+    const words = tokens(text);
+    for (let index = 0; index + width <= words.length; index++) {
+      const shingle = words.slice(index, index + width).join(' ');
+      const first = seen.get(shingle);
+      // Each provider guide follows the same template and must stand alone.
+      const providers = (name: string) => name.startsWith('openmotion-media/references/providers/');
+      if (first && first !== file && !(providers(first) && providers(file))) copies.add(`${first} | ${file}: ${shingle}`);
+      else if (!first) seen.set(shingle, file);
+    }
+  }
+  assert.deepEqual([...copies], []);
+});
+
+test('each moved rule stays in its owner and entries link to it', async () => {
+  const owners = [
+    ['native', ['## Editable preview handoff', '### Continuing edits', '### Codex host calls', '## Project loop']],
+    ['templates', ['## First-run delivery']],
+    ['context', ['## 中途换入口', '## 工具连接', '## 共享质量，按职责应用']],
+    ['reference', ['## Check fidelity and edit dependencies']],
+  ] as const;
+  for (const [section, headings] of owners) {
+    const document = await getWorkflow(section);
+    for (const heading of headings) assert.ok(document.content.split('\n').includes(heading), `${section}: ${heading}`);
+  }
+  const jobs = await getWorkflow('jobs', 'media');
+  assert.deepEqual(jobs.references.filter(reference => reference.documentId.includes('/providers/')).map(reference => reference.section).sort(), ['account', 'atlascloud', 'compatible', 'fal', 'opendesign', 'wavespeed']);
+  const links = [
+    ['recreate', 'templates', 'first-run-delivery'],
+    ['template', 'templates', 'first-run-delivery'],
+    ['recreate', 'native', 'editable-preview-handoff'],
+    ['template', 'native', 'editable-preview-handoff'],
+    ['director', 'native', 'editable-preview-handoff'],
+    ['production', 'native', 'continuing-edits'],
+  ] as const;
+  for (const [workflow, section, anchor] of links) {
+    assert.ok((await getWorkflow('start', workflow)).content.includes(`${section}.md#${anchor}`), `${workflow} -> ${section}#${anchor}`);
+  }
+  const planning = await getWorkflow('planning', 'media');
+  assert.match(planning.content, /the calling entry decides how generated media serves the motion design/);
+  assert.match((await getWorkflow('start', 'director')).content, /生成只升级动态影片，不替代它/);
+  assert.match((await getWorkflow('start', 'recreate')).content, /Keep the reference's story, shot order, motion, holds and cuts around generated media/);
+  assert.match((await getWorkflow('start', 'production')).content, /生成或替换的素材原位接替原素材/);
+  assert.match((await getWorkflow('start', 'template')).content, /A generated or replacement asset takes the planned/);
 });
