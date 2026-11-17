@@ -77,6 +77,8 @@ Motion Design 的资源单位进一步明确为“创作规则 + Agent 方法 + 
 
 [`openmotion-presenter-story`](../../library/skills/openmotion-presenter-story/SKILL.md) 补充知识口播、工作流演示和产品讲解三份 Motion.md 设计配方，采用“真人语音主线 + 源片段到输出时间的映射 + 字幕 / 画中画 / 动效叠层”的构造。它没有人物素材或可执行模板，展示的三组真人前后对比为目录已有的上游演示，不是新 Skill 的验证结果。README 还展示九条真人视频参考。
 
+[`openmotion-growth-teardown`](../../library/skills/openmotion-growth-teardown/SKILL.md) 是可选 Library Skill：从公开资料整理一家公司的增长动作、指标曲线和三招可复制打法，生成九幕增长地图视频的 HyperFrames 源码和由画面事件驱动的合成配乐。所有数字和动作必须带来源；它不增加 MCP Tool 或核心制作路线。
+
 [实例说明](../motion-design-examples.zh-CN.md) 区分已有源码的改编与任意原片的重建；帧采样渲染证据不替代 Studio 导出、声音、目标机器或用户视觉验收。包内保留源码许可和字体声明。工作副本将 CDN / 字体替换为已收录的本地资源，原始源码与哈希保留；浏览器、Node、FFmpeg 等执行工具仍另行安装，不声称任意跨引擎可执行。借鉴 [MotionGit](https://motiongit.com/spec) 的内容、运行时、分发分层，并不构成 `.motion` 格式兼容。社区可以通过普通文件与 Git 分享、Fork、改进和评审；自动 marketplace 入库、数据回流学习与 RAG 仍为方向。
 
 [Motion 资源索引](../collections/README.zh-CN.md) 已可使用，区分可观看参考与可编辑模板；OpenDesign 官网展示案例，公开的品牌／榜单专题集合站仍在规划。Motion Benchmark／Arena 为待讨论规划，无已发布榜单、排名或确定日期。
@@ -93,7 +95,7 @@ The [local resource contract](../readme/RESOURCES.md) covers the four English, S
 
 ### 创作资源与贡献架构
 
-[`library/`](../../library/README.zh-CN.md) organizes reusable source resources into Skills, templates, Motion components, motion design systems and Brandkits. It contains the optional Brandkit Skill, six Motion Design Remix profiles, three Presenter Story recipes, an index of the four native templates, the title-reveal recipe, Ink & Water `MOTION_DESIGN.md` and the OpenMotion `BRANDKIT.md`. Native template sources remain maintained once in `template-library/`; indexing them does not add a second template registration.
+[`library/`](../../library/README.zh-CN.md) organizes reusable source resources into Skills, templates, Motion components, motion design systems and Brandkits. It contains the optional Brandkit Skill, six Motion Design Remix profiles, three Presenter Story recipes, the Growth Teardown research-to-film Skill, an index of the four native templates, the title-reveal recipe, Ink & Water `MOTION_DESIGN.md` and the OpenMotion `BRANDKIT.md`. Native template sources remain maintained once in `template-library/`; indexing them does not add a second template registration.
 
 Library resources are explicitly selected by users or Agents. The Brand Kit collection adds a maintained, pinned design-system import path; arbitrary package discovery, automatic template registration and a synchronized remote marketplace remain outside this boundary. Brand Kit extends the existing `openmotion_assets_use` MCP tool through `action=brand_kit`; the number of registered tool names stays the same. These Library resources do not change the five core production Skills or the workflow registry. Library 内的 Brandkit、Presenter Story 与 Motion Design Remix Skill 可分别选择使用，服务品牌整理、真人叙事设计或具体源码改编，不增加核心制作路线。 Canonical Library folders own the only resource copy. The standalone installer and complete ZIPs include only canonical Library entries. The helper removes a retired forwarding folder only when its complete file hashes match the shipped original; customized folders, additional files and symlinks are preserved and reported for manual review.
 
