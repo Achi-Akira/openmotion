@@ -124,6 +124,12 @@ test('Studio controls fit their resizable generator and timeline panes', { timeo
         return back.bottom <= scenes.top;
       }), 'The mobile Studio header keeps its return action above the scenes');
       const imageNav = '.om-creative-split:has(> [aria-label="Image scenes and models"])';
+      await page.waitForFunction(selector => {
+        const link = document.querySelector<HTMLElement>(selector);
+        if (!link) return false;
+        const bounds = link.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth;
+      }, {}, imageNav + ' > .om-nav-row-link');
       for (const scheme of ['dark', 'light'] as const) {
         await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: scheme }]);
         await page.click(imageNav + ' > .om-nav-row-link');
@@ -141,11 +147,14 @@ test('Studio controls fit their resizable generator and timeline panes', { timeo
         await page.goBack();
         await page.waitForFunction(() => new URL(location.href).searchParams.get('page') === 'cinema');
       }
-      const folder = await page.waitForSelector('.om-app-header-actions [aria-label="Workspace assets"]', { visible: true });
-      const before = await folder!.boundingBox();
-      await page.$eval('.om-app-header .om-creative-navigation', nav => { nav.scrollLeft = nav.scrollWidth; });
-      assert.ok(await page.$eval('.om-creative-navigation', nav => nav.scrollLeft > 0));
-      assert.deepEqual(await folder!.boundingBox(), before, 'The assets shortcut stays fixed when navigation scrolls');
+      const more = await page.waitForSelector('::-p-aria([name="More Studio"][role="button"])', { visible: true });
+      await more!.focus();
+      await page.keyboard.press('Enter');
+      const folder = await page.waitForSelector('.om-nav-more-panel [aria-label="Workspace assets"]', { visible: true });
+      assert.ok(await folder!.evaluate(el => {
+        const bounds = el.getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth;
+      }), 'The assets shortcut fits inside the narrow navigation menu');
       await folder!.click();
       await page.waitForFunction(() => new URL(location.href).searchParams.get('page') === 'assets');
       await page.goBack();
@@ -215,6 +224,18 @@ test('Explore fills every gallery row and plays the featured artwork in place', 
           assert.equal(await hero.evaluate(element => element.getBoundingClientRect().height), initialHeight);
         }
       }
+      const rail = '.om-highlights';
+      const next = rail + ' [data-edge="right"]', previous = rail + ' [data-edge="left"]';
+      await page.waitForSelector(next);
+      assert.equal(await page.$(previous), null);
+      assert.equal(await page.$eval('.om-stories-rail', list => getComputedStyle(list).scrollbarWidth), 'none');
+      await page.click(next);
+      await page.waitForSelector(previous);
+      assert.ok(await page.$(next), 'Both directions are available between the ends');
+      await page.$eval('.om-stories-rail', list => { list.scrollLeft = list.scrollWidth; });
+      await page.waitForSelector(next, { hidden: true });
+      await page.click(previous);
+      await page.waitForSelector(next);
       const artwork = '.om-feature-slide[aria-hidden="false"] .om-feature-camera';
       const cameraState = () => page.$eval(artwork, camera => getComputedStyle(camera).animationPlayState);
       assert.equal(await cameraState(), 'paused', 'Reduced motion starts with a still frame');

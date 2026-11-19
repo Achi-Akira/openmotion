@@ -12,6 +12,8 @@ import { useTemplatePlayback } from './useTemplatePlayback';
 import { editingPresets, motionSkills, skillCategories, type SkillCategory, type MotionSkill } from './skillCatalog';
 import { useWorkspaceChrome } from './WorkspaceChromeContext';
 import { ExploreTemplateCard, TemplatePromptAction, useExploreTemplates } from './ExploreTemplates';
+import { ClaudeStories, ExploreHighlights, ModelCollection } from './ExploreStories';
+import { gptImageStory, seedanceStory } from './exploreModelStories';
 import { ExploreSpotlight, featuredSceneIds } from './ExploreSpotlight';
 import { SkillMedia } from './SkillMedia';
 import { TemplatePoster } from './TemplateGalleryCard';
@@ -39,10 +41,9 @@ type ExploreProps = {
   onCreators: (trigger: HTMLElement) => void;
   onOpenBlackFriday: (trigger: HTMLButtonElement) => void;
   onBrandKit: () => void;
-  onMcp: () => void;
+  onMcp: (client?: 'claude', example?: string) => void;
   active: boolean;
   filters: ExploreFilters;
-  onFilter: (filters: Partial<ExploreFilters>) => void;
 };
 
 function FeedCard({ title, label, description, poster, posterPosition, credit, icon, onClick, sceneId, children, playbackId, onPriority }: {
@@ -204,20 +205,25 @@ function CapabilityIndex({ active, onModel, onNavigate, onChooseStudio, onBrandK
 
 function ExploreCollection({ community, root, ...props }: ExploreProps & { community?: ExploreCommunity; root: RefObject<HTMLElement | null> }) {
   const { t, locale } = useI18n();
-  const { active, onNavigate, onChooseStudio, onSkill, filters, onFilter } = props;
+  const { active, onNavigate, onChooseStudio, onSkill, filters } = props;
   const { openLibrary } = useWorkspaceChrome();
   const [priority, setPriority] = useState<string | null>(null);
   const specialty = community?.source === 'techniques' ? findTechniqueStudio(community.studio) : undefined;
   const skillIds = specialty?.techniques ?? (community?.source === 'templates' ? community.skills : undefined);
   const skills = skillIds ? skillIds.flatMap(id => motionSkills.filter(skill => skill.id === id)) : editingPresets;
   const medium = community ? null : filters.medium;
+  const home = !community && !medium;
+  const showModelStories = !community && medium !== 'audio';
+  const gateway = useMediaCatalog(active && showModelStories);
   const scenes = studioScenes.filter(scene => (!medium || scene.modality === medium) && (!community ||
     (community.source === 'templates' && community.scenes.some(id => id === scene.id))));
   const showMotion = !medium || medium === 'video';
   const showTemplates = showMotion && !specialty;
   const templates = useExploreTemplates(community?.source === 'techniques' ? undefined : community?.category ?? 'all', locale);
   const groups = templates.pages.map(page => page.items);
-  const featuredTemplate = groups[0]?.[0];
+  const firstPage = groups[0] ?? [];
+  const featuredTemplate = medium ? undefined : firstPage[0];
+  const communityPicks = home ? firstPage.slice(1, 5) : [];
   const initialTemplateError = templates.error && !templates.pages.length;
   const catalogKey = [medium, ...groups.map(group => group.map(item => item.id).join(','))].join('|');
   const playing = useTemplatePlayback(root, catalogKey, active && showMotion, true, priority);
@@ -231,42 +237,60 @@ function ExploreCollection({ community, root, ...props }: ExploreProps & { commu
   const templateCard = (item: GalleryTemplate) => <ExploreTemplateCard key={item.id} item={item} active={playing.has(item.id)} onPriority={setPriority}
     onOpen={() => track('explore_feed', 'open_template', { template: item.id, community: community?.id })}
     onTry={prompt => { track('explore_feed', 'try_prompt', { template: item.id, community: community?.id }); tryVideoPrompt(prompt); }} />;
-  const firstTemplates = showTemplates ? (groups[0]?.slice(medium ? 0 : 1) ?? []).map(templateCard) : [];
+  const feedStart = medium ? 0 : communityPicks.length + 1;
+  const firstTemplates = showTemplates ? firstPage.slice(feedStart).map(templateCard) : [];
   const firstGroup: ReactNode[] = [];
   for (let i = 0; i < Math.max(sceneCards.length, firstTemplates.length, skillCards.length); i++) {
     firstGroup.push(firstTemplates[i], sceneCards[i], skillCards[i]);
   }
+  const studioSection = (studio: CreativeStudio) => <StudioCollection key={studio.id} studio={studio} medium={medium}
+    onNavigate={onNavigate} onChooseStudio={onChooseStudio} onSkill={onSkill} playing={playing} onPriority={setPriority} />;
+  const initialLoading = templates.loading && !templates.pages.length;
+  const showCommunityPicks = home && (initialLoading || communityPicks.length > 0);
+  const templateError = <div className="om-discovery-empty"><span>{t('Templates could not be loaded.')}</span><button className="om-button" onClick={templates.retry}>{t('Retry')}</button></div>;
   return <>
-    {!medium && <div className="om-explore-features" data-split={Boolean(featuredTemplate || initialTemplateError || (templates.loading && !templates.pages.length))}>
+    {!medium && <div className="om-explore-features" data-split={Boolean(featuredTemplate || initialTemplateError || initialLoading)}>
       {community ? <CommunitySpotlight community={community} skill={skills[0]} onChooseStudio={onChooseStudio} /> :
         <ExploreSpotlight active={active} onOpenBlackFriday={props.onOpenBlackFriday} onNavigate={onNavigate} onOpenMotion={() => onChooseStudio(motionStudio)} onModelHub={props.onModelHub} />}
       {featuredTemplate && <TemplateSpotlight item={featuredTemplate} onTry={tryVideoPrompt} />}
-      {initialTemplateError && <div className="om-featured-template om-discovery-empty"><span>{t('Templates could not be loaded.')}</span><button className="om-button" onClick={templates.retry}>{t('Retry')}</button></div>}
-      {templates.loading && !templates.pages.length && <Skeleton className="om-featured-template-skeleton" />}
+      {initialTemplateError && templateError}
+      {initialLoading && <Skeleton className="om-featured-template-skeleton" />}
     </div>}
+    {home && <>
+      <ExploreHighlights onChooseStudio={onChooseStudio} onOpenBlackFriday={props.onOpenBlackFriday} />
+      <ClaudeStories onClaude={example => props.onMcp('claude', example)} />
+    </>}
+    {showCommunityPicks && <section aria-labelledby="explore-community">
+      <header className="om-discovery-heading"><h2 id="explore-community">{t('Community showcase')}</h2>
+        <button className="om-nav-item" onClick={event => { track('explore_feed', 'creators'); props.onCreators(event.currentTarget); }}>{t('Creators')}<RemixIcon name="arrow-right-line" size={16} /></button>
+      </header>
+      {initialLoading && <div className="om-community-picks" role="status" aria-label={t('Loading templates…')}>{[0, 1, 2, 3].map(n => <Skeleton key={n} />)}</div>}
+      {communityPicks.length > 0 && <div className="om-community-picks">{communityPicks.map(templateCard)}</div>}
+    </section>}
+    {showModelStories && medium !== 'image' && <ModelCollection story={seedanceStory} gateway={gateway} onNavigate={onNavigate} onModel={props.onModel} />}
+    {home && studioSection(findMediaStudio('design')!)}
+    {showModelStories && medium !== 'video' && <ModelCollection story={gptImageStory} gateway={gateway} onNavigate={onNavigate} onModel={props.onModel} />}
     <section className="om-explore-feed" aria-labelledby="om-feed-heading">
       <header className="om-discovery-heading">
         <div><h2 id="om-feed-heading">{t(community?.id === '3d-motion' ? '3D techniques' : 'Community & capabilities')}</h2>
           <p className="om-muted">{t(specialty?.briefHint ?? 'Open a template to see how it works, or pick a scene to start creating.')}</p>
         </div>
-        {!community && <div className="om-community-tabs om-choice-tabs" role="group" aria-label={t('Media type')}>{(['all', 'image', 'video', 'audio'] as const).map(kind =>
-          <button key={kind} className="om-nav-item" aria-pressed={(medium ?? 'all') === kind} onClick={() => { track('explore_feed', 'media_filter', { medium: kind }); onFilter({ medium: kind === 'all' ? null : kind }); }}>{t(kind === 'all' ? 'All' : mediaLabels[kind])}</button>)}</div>}
       </header>
       <div className="om-feed-group">
         {firstGroup}
         {showTemplates && groups.slice(1).flatMap(group => group.map(templateCard))}
       </div>
       {showTemplates && <div className="om-feed-more">
-        {medium && initialTemplateError && <button className="om-button" onClick={templates.retry}>{t('Retry')}</button>}
+        {medium && initialTemplateError && templateError}
         {templates.loading && (medium || templates.pages.length > 0) && <div className="om-feed-loading" aria-label={t('Loading templates…')} role="status">{[0, 1, 2].map(n => <Skeleton key={n} />)}</div>}
-        {templates.error && !initialTemplateError && <div className="om-discovery-empty"><span>{t('Templates could not be loaded.')}</span><button className="om-button" onClick={templates.retry}>{t('Retry')}</button></div>}
+        {templates.error && !initialTemplateError && templateError}
         {!templates.error && !templates.loading && (templates.hasMore ? <button className="om-button" onClick={() => { track('explore_feed', 'load_more', { community: community?.id, medium: medium ?? 'all' }); templates.loadMore(); }}>{t('More community templates')}<RemixIcon name="add-line" size={16} /></button> :
-          !featuredTemplate && <span className="om-muted">{t('No templates available. Open the library or try again later.')}</span>)}
+          !firstPage.length && <span className="om-muted">{t('No templates available. Open the library or try again later.')}</span>)}
         <button className="om-nav-item" onClick={event => { track('explore_feed', 'view_all_templates', { community: community?.id }); openLibrary(event.currentTarget); }}>{t('View all templates')}<RemixIcon name="arrow-right-line" size={16} /></button>
+        {!showCommunityPicks && <button className="om-nav-item" onClick={event => { track('explore_feed', 'creators', { community: community?.id }); props.onCreators(event.currentTarget); }}>{t('Creators')}<RemixIcon name="arrow-right-line" size={16} /></button>}
       </div>}
     </section>
-    {!community && discoveryStudios.map(studio => <StudioCollection key={studio.id} studio={studio} medium={medium}
-      onNavigate={onNavigate} onChooseStudio={onChooseStudio} onSkill={onSkill} playing={playing} onPriority={setPriority} />)}
+    {!community && discoveryStudios.filter(studio => !home || studio.id !== 'design').map(studioSection)}
     <CapabilityIndex {...props} />
   </>;
 }
@@ -277,14 +301,7 @@ export function ExploreStudios(props: ExploreProps) {
   const community = exploreCommunities.find(item => item.id === props.filters.community);
   return <main ref={root} className="om-explore">
     <div className="om-discovery-page">
-      <header className="om-explore-masthead"><h1>{t('Explore')}</h1>
-        <nav className="om-community-tabs om-choice-tabs" aria-label={t('Communities')}>
-          <button className="om-nav-item" aria-pressed={!community} onClick={() => { track('explore_tabs', 'community_tab', { community: 'discover' }); props.onFilter({ community: null, medium: null }); }}>{t('Discover')}</button>
-          {exploreCommunities.map(feed => <button key={feed.id} className="om-nav-item" aria-pressed={community?.id === feed.id}
-            onClick={() => { track('explore_tabs', 'community_tab', { community: feed.id }); props.onFilter({ community: feed.id, medium: null }); }}>{t(feed.label)}</button>)}
-          <button className="om-nav-item" onClick={event => { track('explore_tabs', 'creators'); props.onCreators(event.currentTarget); }}>{t('Creators')}</button>
-        </nav>
-      </header>
+      <h1 className="om-explore-title">{t(!community && props.filters.medium ? mediaLabels[props.filters.medium] : 'Explore')}</h1>
       <ExploreCollection key={locale + '/' + (community?.id ?? '')} community={community} root={root} {...props} />
     </div>
   </main>;
