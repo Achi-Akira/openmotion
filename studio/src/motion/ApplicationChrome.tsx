@@ -4,6 +4,7 @@ import { PrimaryNavigationButton, PrimaryNavigationRail } from '../../../package
 import { RemixIcon } from '../icons/RemixIcons';
 import { Menu, MenuItem, MenuSeparator, MenuSubmenu, MenuRadioGroup, MenuRadioItem } from '../components/ui/Menu';
 import { Tooltip } from '../components/ui/Tooltip';
+import { IconButton } from '../components/ui/IconButton';
 import { languages, useI18n, type Locale } from '../i18n/I18n';
 import { useWorkspaceChrome } from './WorkspaceFrame';
 import { useAccountSummary } from './AccountSettings';
@@ -19,15 +20,17 @@ import { WorkspaceSearch } from './WorkspaceSearch';
 
 const avatarSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
-export function ApplicationHeader({ settings, openAsset, onCommunity, openSettings, ...navigation }: Omit<CreativeNavigationProps, 'openProviders'> & {
+export function ApplicationHeader({ settings, openAsset, onCommunity, openSettings, toggleResourceRail, ...navigation }: Omit<CreativeNavigationProps, 'openProviders'> & {
   settings: SettingsSection | null;
+  toggleResourceRail?: () => void;
   openSettings: (section: SettingsSection) => void;
   openAsset: (assetId: string, version: string) => void;
   onCommunity: (community: ExploreCommunity) => void;
 }) {
   const { t } = useI18n();
-  const { openAssets, assetsOpen, openHome, openModelSettings } = useWorkspaceChrome();
+  const { openAssets, assetsOpen, openHome, openModelSettings, navigationCollapsed } = useWorkspaceChrome();
   return <header className="om-app-header">
+    {toggleResourceRail && <Tooltip label={t(navigationCollapsed ? 'Expand sidebar' : 'Collapse sidebar')}><IconButton type="button" onClick={toggleResourceRail} aria-expanded={!navigationCollapsed} aria-controls="om-application-navigation" aria-label={t(navigationCollapsed ? 'Expand sidebar' : 'Collapse sidebar')} icon={<RemixIcon name="side-bar-line" size={16} />} /></Tooltip>}
     <Tooltip label={t('Back to home')}><button type="button" className="om-nav-item om-app-brand" onClick={openHome} aria-label={t('Back to home')}><BrandLogo compact /></button></Tooltip>
     <CreativeNavigation {...navigation} openProviders={openModelSettings} />
     <div className="om-app-header-actions">
@@ -38,12 +41,12 @@ export function ApplicationHeader({ settings, openAsset, onCommunity, openSettin
         </button>
       </Tooltip>
       <div className="om-app-header-links"><CommunityLink /><GitHubLink /></div>
-      {settings && <button className="motion-icon-button" aria-label={t(settings === 'brand-kit' ? 'Close Brand Kit' : 'Close settings')} onClick={openHome}><RemixIcon name="close-line" size={20} /></button>}
+      {settings && settings !== 'brand-kit' && <button className="motion-icon-button" aria-label={t('Close settings')} onClick={openHome}><RemixIcon name="close-line" size={20} /></button>}
       <ApplicationAccountMenu settings={settings} openSettings={openSettings} />
     </div>
   </header>;
 }
-export function ApplicationRail({ openSettings, projects }: { openSettings: (section: SettingsSection) => void; projects: ReactNode }) {
+export function ApplicationRail({ openSettings, projects, resource }: { openSettings: (section: SettingsSection) => void; projects?: ReactNode; resource?: "templates" | "brand-kit" | "skills" }) {
   const { t } = useI18n();
   const { openLibrary, openSkills, skillsOpen, switchingDisabled, navigationCollapsed } = useWorkspaceChrome();
   const item = (label: string, icon: string, action: (event: MouseEvent<HTMLButtonElement>) => void, active = false, disabled = false) => (
@@ -63,9 +66,9 @@ export function ApplicationRail({ openSettings, projects }: { openSettings: (sec
     <PrimaryNavigationRail id="om-application-navigation" className="om-app-rail om-collapsible" data-collapsed={navigationCollapsed}
       aria-label={t('Application navigation')} aria-hidden={navigationCollapsed} inert={navigationCollapsed} footer={footer}>
       {projects}
-      {item('Template library', 'apps-2-line', event => openLibrary(event.currentTarget), false, switchingDisabled)}
-      {item('Brand Kit', 'palette-line', () => openSettings('brand-kit'))}
-      {item('Skills', 'puzzle-line', openSkills, skillsOpen)}
+      {item('Template library', 'apps-2-line', event => openLibrary(event.currentTarget), resource === 'templates', !resource && switchingDisabled)}
+      {item('Brand Kit', 'palette-line', () => openSettings('brand-kit'), resource === 'brand-kit')}
+      {item('Skills', 'puzzle-line', openSkills, resource ? resource === 'skills' : skillsOpen)}
     </PrimaryNavigationRail>
   );
 }
