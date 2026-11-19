@@ -3,11 +3,14 @@ import { useI18n } from '../i18n/I18n';
 import { RemixIcon } from '../icons/RemixIcons';
 import { motionStudio, sceneDestination, studioScenes, type StudioDestination, type StudioScene } from './creativeStudios';
 import { sceneExamples } from './sceneShowcase';
-import motionPoster from './skill-covers/bubble-field.jpg?url';
-import motionClip from './skill-covers/bubble-field.mp4?url';
+import { motionSkills } from './skillCatalog';
+import { useSkillPreview } from './useSkillPreview';
 
 export const featuredSceneIds: readonly StudioScene['id'][] = ['shot-image', 'text-to-video', 'text-to-image'];
 const slideDuration = 6000;
+const motionCover = motionSkills.find(skill => skill.id === 'openmotion-bubble-field')?.cover;
+const motionPoster = motionCover?.poster ?? '';
+const motionClip = motionCover?.video;
 interface FeaturedSlide {
   id: string; title: string; subtitle: string; hint: string; icon: string; poster: string; clip?: string; credit?: string;
   scene?: { target: StudioDestination; prompt: string };
@@ -24,13 +27,16 @@ const slides: FeaturedSlide[] = [{
 function FeaturedClip({ src, poster, playing }: { src: string; poster: string; playing: boolean }) {
   const player = useRef<HTMLVideoElement>(null);
   const [failed, setFailed] = useState(false);
+  const [started, setStarted] = useState(playing);
+  const videoSource = useSkillPreview(src, (started || playing) && !failed);
+  useEffect(() => { if (playing) setStarted(true); }, [playing]);
   useEffect(() => {
     const video = player.current;
     if (!video) return;
     if (playing) void video.play().catch(() => { /* The poster remains available if autoplay is blocked. */ });
     else video.pause();
-  }, [playing]);
-  return failed ? null : <video ref={player} src={src} poster={poster} muted loop playsInline preload="none" aria-hidden="true" onError={() => setFailed(true)} />;
+  }, [playing, videoSource]);
+  return videoSource && !failed ? <video ref={player} src={videoSource} poster={poster} muted loop playsInline preload="none" aria-hidden="true" onError={() => setFailed(true)} /> : null;
 }
 
 export function ExploreSpotlight({ active, onNavigate, onOpenMotion }: {
