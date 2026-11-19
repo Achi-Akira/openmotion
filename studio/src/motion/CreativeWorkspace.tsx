@@ -2,6 +2,7 @@ import type { TechniqueStudio } from '../../../shared/studio-catalog';
 import type { RefObject } from 'react';
 import { useI18n } from '../i18n/I18n';
 import { RemixIcon } from '../icons/RemixIcons';
+import { WorkspaceResourceActions } from './WorkspaceResourceActions';
 import { AssetsPage } from './AssetsPage';
 import type { AssetDraft } from './AssetComposer';
 import { useMediaCatalog } from './useMediaCatalog';
@@ -17,8 +18,8 @@ export type StudioCreation = {
   chooseModel: (model: string) => void;
 };
 
-export function CreativeWorkspace({ destination, skill, visit, onNavigate, onExplore, onCollection, onOpenAssets, hasProject, active, drafts }: {
-  onOpenAssets?: () => void;
+export function CreativeWorkspace({ destination, skill, visit, onNavigate, onExplore, onCollection, onOpenBrandKit, hasProject, active, drafts }: {
+  onOpenBrandKit?: () => void;
   skill: string | null; onCollection: (studio: TechniqueStudio) => void; onExplore: () => void; drafts: RefObject<Map<string, AssetDraft>>; destination: StudioDestination | null; active: boolean; visit: number; onNavigate: (next: StudioDestination) => void; hasProject: boolean;
 }) {
   const { t } = useI18n();
@@ -48,7 +49,7 @@ export function CreativeWorkspace({ destination, skill, visit, onNavigate, onExp
         reportCreativeClick('creative_studio', 'studio_bar', 'scene_tab', destinationTarget(next));
         onNavigate(next);
       }}>{t(item.label)}</button>)}</nav>}
-      {onOpenAssets && <button className="om-nav-item om-studio-library-link" onClick={() => { reportCreativeClick('creative_studio', 'studio_bar', 'open_assets', destinationTarget(destination)); onOpenAssets(); }} aria-label={t('Workspace assets')}><RemixIcon name="folder-open-line" size={16} /><span>{t('Workspace assets')}</span></button>}
+      {onOpenBrandKit && <div className="om-control-row om-studio-library-link"><WorkspaceResourceActions onBrandKit={onOpenBrandKit} /></div>}
     </header>
     <AssetsPage key={draftKey + visit} active={active} hasProject={hasProject} studio={{ destination, catalog, useAsFirstFrame, initialDraft: drafts.current.get(draftKey),
       remember: draft => drafts.current.set(draftKey, draft), chooseModel: model => onNavigate({ ...destination, model }) }} />

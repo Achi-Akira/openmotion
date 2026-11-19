@@ -1,3 +1,4 @@
+import type { SkillCategory } from './skillCategories';
 import { FieldInput } from "../components/ui/FormField";
 import { DisclosureRow } from "../../../packages/design-system/react/DisclosureRow";
 import { useProjectArchives, ProjectArchiveMenu, type ProjectArchiveActions } from './ProjectArchives';
@@ -84,8 +85,8 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
     window.addEventListener(WORKSPACE_LOCATION_CHANGED, sync);
     return () => window.removeEventListener(WORKSPACE_LOCATION_CHANGED, sync);
   }, []);
-  const navigatePage = useCallback((patch: Partial<WorkspacePage>) => {
-    writeWorkspaceHistory(workspacePageHref(location.href, patch));
+  const navigatePage = useCallback((patch: Partial<WorkspacePage>, replace = false) => {
+    writeWorkspaceHistory(workspacePageHref(location.href, patch), replace);
   }, []);
   const presentation = workspacePresentation(location.search);
   const guard = useRef<EditorGuard | null>(null);
@@ -124,23 +125,21 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
   const collectionSkillTrigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (page.skill) return;
-    if (page.blackFriday) collectionSkillTrigger.current?.focus({ preventScroll: true });
+    if (page.templateCollection === 'black-friday') collectionSkillTrigger.current?.focus({ preventScroll: true });
     collectionSkillTrigger.current = null;
-  }, [page.blackFriday, page.skill]);
+  }, [page.templateCollection, page.skill]);
   const [narrow, setNarrow] = useState(() => window.innerWidth < 1000);
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1000);
   const [projectQuery, setProjectQuery] = useState('');
   const editorRoute = !settings && !pageOpen;
   const editorActive = editorRoute && !connectionsOpen;
   useEffect(() => setSidebarOpen(editorRoute && !narrow), [editorRoute, narrow]);
-  const resource = templatesPage ? 'templates' : settings === 'brand-kit' ? 'brand-kit' : skillsOpen ? 'skills' : undefined;
-  const [resourceRailCollapsed, setResourceRailCollapsed] = useState(false);
-  const navigationCollapsed = resource ? resourceRailCollapsed : !editorActive;
+  const navigationCollapsed = !editorActive;
   const toggleSidebar = useCallback(() => setSidebarOpen(open => !open), []);
   const [assetsVisited, setAssetsVisited] = useState(assetsOpen);
   useEffect(() => { if (assetsOpen) setAssetsVisited(true); }, [assetsOpen]);
   const openAssets = useCallback(() => { navigatePage({ assets: true, assetId: null, assetVersion: null, templates: false }); }, [navigatePage]);
-  const openSkills = useCallback(() => { navigatePage({ skills: true, assets: false, settings: null, templates: false }); }, [navigatePage]);
+  const openSkills = useCallback((skillCategory: SkillCategory | null = null) => { navigatePage({ skills: true, skill: null, skillCategory, templates: false }); }, [navigatePage]);
   const openSettings = useCallback((section: SettingsSection) => {
     navigatePage({ settings: section, assets: false, skills: false, templates: false });
   }, [navigatePage]);
@@ -182,12 +181,13 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
   const visibleNotice = notice && dismissedNotice !== noticeKey;
   if (!notice && dismissedNotice !== null) setDismissedNotice(null);
   const value: WorkspaceChrome = { workspace, switchingDisabled, saveState: editorState?.saveState || saveState, registerEditor, beforeViewChange,
-    openLibrary: (trigger, template) => {
-      if (templatesPage && !page.blackFriday && !template) return;
+    openLibrary: (trigger, template, collection) => {
+      if (templatesPage && !page.creators && page.templateCollection === (collection ?? null) && !template) return;
       libraryTrigger.current = trigger ?? null;
       workspace.clearError();
-      cardPreview.current = template ? { template, locale } : null;
-      navigatePage({ templates: !template, template: template?.id ?? null, creators: false, creator: null, blackFriday: false, ...(page.blackFriday && { skill: null }) });
+      const openCollection = Boolean(collection) || !template;
+      cardPreview.current = !openCollection && template ? { template, locale } : null;
+      navigatePage({ templates: openCollection, template: template?.id ?? null, templateCollection: openCollection ? (collection ?? null) : null, creators: false, creator: null, ...(page.templateCollection === 'black-friday' && { skill: null }) });
     },
     openConnections: entry => { connectionEntry.current = entry; openSettings('mcp'); },
     openModelSettings: () => openSettings('providers'),
@@ -218,7 +218,7 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
   };
   const openModel = (modelOverview: string) => navigatePage({ modelOverview, templates: false, ...lastExplore.current });
   const openModelHub = (modelHub: string) => navigatePage({ modelHub, templates: false, ...lastExplore.current });
-  const currentPage = templatesPage ? null : page.api ? 'api' : page.explore ? 'explore' : settings === 'mcp' ? 'mcp' : null;
+  const currentPage = templatesPage || page.explore || skillsOpen ? 'explore' : page.api ? 'api' : settings === 'mcp' ? 'mcp' : null;
   // One page view per arrival on Explore, the Motion Studio landing, the API page or a model overview.
   // Design, Cinema and Sound report from their own Studio form (AssetsPage), which knows the scene shown.
   const routeView = templatesPage ? null : page.explore ? 'explore' : page.motion ? 'motion' : page.api ? 'api' : page.modelOverview ? 'model:' + page.modelOverview : null;
@@ -232,8 +232,9 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
     // Only an arrival counts; filter changes within Explore are reported as clicks.
   }, [routeView]);
   // Where the top navigation is shown, so its clicks segment by the page the user was on.
-  const navTrackingPage: CreativePage = templatesPage ? 'studio' : currentPage ?? (settings === 'brand-kit' ? 'brand_kit' : settings ? 'settings'
-    : page.modelOverview ? 'model_overview' : page.modelHub ? 'model_hub' : page.studio || page.motion ? 'creative_studio' : skillsOpen || page.specialty ? 'skills' : assetsOpen ? 'assets' : 'studio');
+  const navTrackingPage: CreativePage = templatesPage ? 'studio' : page.api ? 'api' : page.explore ? 'explore' : settings === 'mcp' ? 'mcp'
+    : settings === 'brand-kit' ? 'brand_kit' : settings ? 'settings'
+    : page.modelOverview ? 'model_overview' : page.modelHub ? 'model_hub' : page.studio || page.motion ? 'creative_studio' : skillsOpen || page.specialty ? 'skills' : assetsOpen ? 'assets' : 'studio';
   const returnToExplore = () => {
     const filters = page.motion || page.modelOverview || page.modelHub || page.specialty || page.studio || page.skills
       ? { community: page.community, medium: page.medium } : lastExplore.current;
@@ -246,9 +247,10 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
     navigatePage({ settings: 'mcp', templates: false, mcpExample: example ?? null, ...(client && { client, setup: 'agent' }) });
   };
   const galleryNavigation = !hostChrome && <CreativeNavigation trackingPage="studio" onModel={openModel} specialty={page.specialty} onChooseStudio={chooseStudio} onSkill={openSkill} currentPage={null} onOpenPage={openPage} destination={null} motionActive={false} onNavigate={openStudio} openProviders={value.openModelSettings} />;
-  const library = connectionsOpen && <ConnectionDialog blackFriday={page.blackFriday} collectionSkillOpen={page.blackFriday && Boolean(page.skill)} detailOnly={detailOnly}
+  const library = connectionsOpen && <ConnectionDialog collection={page.templateCollection} onCollectionChange={templateCollection => navigatePage({ templateCollection }, true)}
+    collectionSkillOpen={page.templateCollection === 'black-friday' && Boolean(page.skill)} detailOnly={detailOnly}
     initialTemplate={detailOnly && cardPreview.current?.locale === locale ? cardPreview.current.template : undefined}
-    onBrowseTemplates={() => navigatePage({ templates: true, blackFriday: false, ...(page.blackFriday && { skill: null }), template: null })}
+    onBrowseTemplates={() => navigatePage({ templates: true, templateCollection: null, ...(page.templateCollection === 'black-friday' && { skill: null }), template: null })}
     onOpenSkill={(skill, trigger) => {
       if (!templatesPage) { openSkill(skill); return; }
       collectionSkillTrigger.current = trigger;
@@ -263,7 +265,7 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
       else closeStandalonePreview();
     }}
     busy={libraryBusy} openingDisabled={switchingDisabled} error={workspace.error}
-    onClose={detailOnly ? closeStandalonePreview : () => page.blackFriday ? returnToExplore() : navigatePage({ templates: false })}
+    onClose={detailOnly ? closeStandalonePreview : () => page.templateCollection === 'black-friday' ? returnToExplore() : navigatePage({ templates: false })}
     onPrepareTemplate={async (template, requestId) => {
     try { await beforeViewChange(); }
     catch (error) { throw new TemplatePreparationBlockedError(error instanceof Error ? error.message : t('Working…')); }
@@ -277,16 +279,16 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
     <Dialog.Root open={sidebarOpen && narrow && editorActive} onOpenChange={setSidebarOpen}>
     <div ref={applicationRef} className="om-application" data-embedded={presentation.embedded} data-host-chrome={hostChrome} data-navigation-collapsed={navigationCollapsed}>
       <ApplicationHeader atExploreHome={page.explore && !page.community && !page.medium && !connectionsOpen}
-        onModel={openModel} specialty={page.specialty} onChooseStudio={chooseStudio} openSettings={openSettings} toggleResourceRail={resource && !hostChrome ? () => setResourceRailCollapsed(collapsed => !collapsed) : undefined}
+        onModel={openModel} specialty={page.specialty} onChooseStudio={chooseStudio} openSettings={openSettings}
         openAsset={(assetId, assetVersion) => navigatePage({ assets: true, assetId, assetVersion, templates: false })}
         onCommunity={feed => navigatePage({ explore: true, community: feed.id, medium: null, templates: false })} onSkill={openSkill} currentPage={currentPage} trackingPage={navTrackingPage} onOpenPage={openPage} settings={visibleSettings} destination={templatesPage ? null : page.studio} motionActive={!templatesPage && (page.motion || editorActive)} onNavigate={openStudio} />
-      {(editorRoute || resource) && <ApplicationRail resource={resource} openSettings={openSettings} projects={editorRoute ? <WorkspaceProjectsButton
+      {editorRoute && <ApplicationRail openSettings={openSettings} projects={<WorkspaceProjectsButton
         applicationRef={applicationRef}
         expanded={sidebarOpen && editorActive}
         previewEnabled={!narrow && !sidebarOpen && editorActive}
         onToggle={toggleSidebar}>
         {close => <WorkspaceSidebar archives={archives} currentId={projectId} close={close} expand={() => { close(); toggleSidebar(); }} onNavigate={close} query={projectQuery} setQuery={setProjectQuery} />}
-      </WorkspaceProjectsButton> : undefined} />}
+      </WorkspaceProjectsButton>} />}
       <div className="motion-workspace">
       <Dialog.Portal>
         <Dialog.Backdrop className="hf-overlay-backdrop motion-sidebar-backdrop" />
@@ -303,12 +305,10 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
         {children}
       </div>
       {(exploreVisited || page.explore) && <div className="om-explore-host" hidden={!page.explore || templatesPage} inert={!page.explore || templatesPage}>
-        <ExploreStudios onModel={openModel} onModelHub={openModelHub} onOpenBlackFriday={trigger => {
-          libraryTrigger.current = trigger;
-          workspace.clearError();
+        <ExploreStudios initialTemplateCollection={page.templateCollection} onModel={openModel} onModelHub={openModelHub} onOpenBlackFriday={trigger => {
           reportBlackFridayEntry();
-          navigatePage({ explore: true, templates: true, blackFriday: true, creators: false, template: null, skill: null });
-        }} onCreators={trigger => { libraryTrigger.current = trigger; navigatePage({ templates: true, creators: true, creator: null, template: null }); }} onBrandKit={() => openSettings('brand-kit')} onMcp={(client, example) => openPage('mcp', client, example)} filters={lastExplore.current} onChooseStudio={chooseStudio} active={page.explore && !connectionsOpen} onNavigate={openStudio} onSkill={openSkill} />
+          value.openLibrary(trigger, undefined, 'black-friday');
+        }} onCreators={trigger => { libraryTrigger.current = trigger; navigatePage({ templates: true, creators: true, creator: null, template: null }); }} onBrandKit={() => openSettings('brand-kit')} onMcp={(client, example) => openPage('mcp', client, example)} filters={lastExplore.current} onFilter={navigatePage} onChooseStudio={chooseStudio} active={page.explore && !connectionsOpen} onNavigate={openStudio} onSkill={openSkill} />
       </div>}
       {page.motion && !templatesPage && <div className="om-explore-host"><MotionStudioPage active={!connectionsOpen}
         onExplore={returnToExplore} onOpenEditor={() => openStudio(null)} /></div>}
@@ -319,15 +319,15 @@ export function WorkspaceFrame({ children, waitForSaves, projectId, sessionId, b
         onUse={() => chooseStudio(motionStudio)} /></div>}
       {page.modelOverview && !templatesPage && <div className="om-explore-host"><ModelOverview id={page.modelOverview} onExplore={returnToExplore}
         onProvider={provider => navigatePage({ settings: 'providers', provider: provider ?? null, templates: false })} onScene={openStudio} /></div>}
-      <div className="om-workspace-layer" hidden={templatesPage} inert={templatesPage}><CreativeWorkspace onOpenAssets={hostChrome ? openAssets : undefined} skill={page.skill} onCollection={specialty => navigatePage({ specialty, templates: false })} onExplore={returnToExplore} drafts={studioDrafts} active={!connectionsOpen} destination={page.studio} visit={studioVisit} hasProject={Boolean(projectId)} onNavigate={studio => navigatePage({ studio, templates: false })} /></div>
+      <div className="om-workspace-layer" hidden={templatesPage} inert={templatesPage}><CreativeWorkspace onOpenBrandKit={hostChrome ? () => openSettings('brand-kit') : undefined} skill={page.skill} onCollection={specialty => navigatePage({ specialty, templates: false })} onExplore={returnToExplore} drafts={studioDrafts} active={!connectionsOpen} destination={page.studio} visit={studioVisit} hasProject={Boolean(projectId)} onNavigate={studio => navigatePage({ studio, templates: false })} /></div>
       {(assetsVisited || assetsOpen) && <div className="om-assets-host" hidden={!assetsOpen || Boolean(settings) || templatesPage} inert={!assetsOpen || Boolean(settings) || templatesPage}><AssetsPage hasProject={Boolean(projectId)} active={assetsOpen && !settings && !templatesPage} routeId={page.assetId} routeVersion={page.assetVersion} onAssetRoute={selectAssetRoute} /></div>}
-      {(skillsOpen || page.specialty) && !settings && !templatesPage && <div className="om-skills-host"><SkillsPage previewsEnabled={!connectionsOpen} briefs={skillBriefs.current} onCreate={openStudio} key={page.specialty?.id ?? 'skills'} studio={page.specialty ?? undefined} onExplore={returnToExplore} skillId={page.skill} onSkillChange={skill => navigatePage({ skill })} hasProject={Boolean(projectId)} /></div>}
+      {(skillsOpen || page.specialty) && !settings && !templatesPage && <div className="om-skills-host"><SkillsPage previewsEnabled={!connectionsOpen} briefs={skillBriefs.current} onCreate={openStudio} key={page.specialty?.id ?? 'skills'} studio={page.specialty ?? undefined} onExplore={returnToExplore} skillId={page.skill} routeCategory={page.skills ? page.skillCategory : undefined} onCategoryChange={skillCategory => navigatePage({ skillCategory }, true)} onSkillChange={skill => navigatePage({ skill })} hasProject={Boolean(projectId)} /></div>}
       {settings && !templatesPage && <SettingsSurfaceBoundary key={settings}>{settings === 'brand-kit'
         ? <BrandKitPage inWorkspace={!hostChrome} onClose={openHome} selectedId={page.brandKit} onSelect={brandKit => navigatePage({ brandKit })} previewsEnabled={!connectionsOpen} hasProject={Boolean(projectId)} /> : settings === 'mcp'
         ? <McpConnectionPage entry={connectionEntry.current} projectId={projectId ?? undefined} hasProject={Boolean(projectId)} previewsEnabled={!connectionsOpen} openLibrary={value.openLibrary} openProviders={value.openModelSettings} route={page} onRouteChange={navigatePage} />
         : <SettingsCenter hasProject={Boolean(projectId)} section={settings} onSection={openSettings} openConnections={value.openConnections} providerId={page.provider} onProviderChange={provider => navigatePage({ provider })} />}</SettingsSurfaceBoundary>}
       {(templatesPage || detailOnly) && library}
-      {templatesPage && page.blackFriday && page.skill && <SkillsPage detailOnly skillId={page.skill}
+      {templatesPage && page.templateCollection === 'black-friday' && page.skill && <SkillsPage detailOnly skillId={page.skill}
         onSkillChange={skill => navigatePage({ skill })} />}
       </div>
     </div>
