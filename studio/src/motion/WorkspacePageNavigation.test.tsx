@@ -52,6 +52,17 @@ async function clickWorkspaceBack() {
   await act(async () => { button('Back').click(); await new Promise(resolve => setTimeout(resolve, 0)); });
 }
 const traverse = async (delta: number) => { await act(async () => { history.go(delta); await new Promise(resolve => setTimeout(resolve, 0)); }); };
+const settingsBack = () => container.querySelector<HTMLButtonElement>('.om-settings-heading > button.om-nav-item');
+const leaveSettings = async () => {
+  expect(settingsBack()?.textContent).toBe('Go back');
+  await act(async () => { settingsBack()!.click(); await new Promise(resolve => setTimeout(resolve, 0)); });
+};
+const breadcrumb = () => container.querySelector<HTMLAnchorElement>('.om-workspace-breadcrumb a');
+const returnThroughBreadcrumb = async (label: string) => {
+  const link = breadcrumb();
+  expect(link?.textContent).toBe(label);
+  await act(async () => { link!.click(); await new Promise(resolve => setTimeout(resolve, 0)); });
+};
 async function mount(key = 0) { await act(async () => root.render(<I18nProvider initialLocale="en"><MotionApp key={key} /></I18nProvider>)); }
 beforeEach(() => {
   localStorage.clear(); history.replaceState(null, '', firstUrl);
@@ -82,6 +93,7 @@ it.each(settingsSections)('restores a copied %s page on a fresh mount', async se
     expect(page().settings).toBe(section);
     expect(container.querySelector<HTMLElement>('.motion-workspace-content')?.hidden).toBe(true);
     if (section === 'mcp') {
+      expect(breadcrumb()).toBeNull();
       expect(container.querySelector('#mcp-title')?.textContent).toContain('Claude Code');
       expect(container.querySelector('[role=tab][data-state=active]') || container.querySelector('a[download]')).toBeTruthy();
       expect(container.querySelector('a[download]')?.getAttribute('href')).toBe('/connect/config?host=claude');
@@ -111,8 +123,11 @@ it('navigates settings, MCP tabs and history without remounting or flushing the 
   await mount(); const draft = container.querySelector<HTMLInputElement>('[aria-label="Editor draft"]')!;
   draft.value = 'Keep this edit'; const wait = vi.fn(async () => {}); editor.wait = wait;
   await accountAction('Settings'); expect(page().settings).toBe('general');
+  expect(settingsBack()).not.toBeNull();
+  expect(button('Close settings')).toBeUndefined();
   await click('Appearance'); expect(page().settings).toBe('appearance');
   await openMcp(); expect(page().settings).toBe('mcp');
+  expect(breadcrumb()).toBeNull();
   await click('Claude Code'); await click('Manual setup');
   expect(page()).toMatchObject({ client: 'claude', setup: 'manual' });
   await traverse(-1); expect(page().setup).toBe('agent');
@@ -120,7 +135,9 @@ it('navigates settings, MCP tabs and history without remounting or flushing the 
   await traverse(-1); expect(page().client).toBe('codex');
   await traverse(-1); expect(page().settings).toBe('appearance');
   await traverse(1); expect(page().settings).toBe('mcp');
-  await click('Close settings'); expect(page().settings).toBeNull();
+  expect(settingsBack()).toBeNull();
+  expect(button('Close settings')).toBeUndefined();
+  await click('Explore'); expect(page()).toMatchObject({ explore: true, settings: null });
   expect(container.querySelector('input[aria-label="Editor draft"]')).toBe(draft);
   expect(draft.value).toBe('Keep this edit'); expect(editor.mounts).toBe(1); expect(wait).not.toHaveBeenCalled();
   expect(location.search).toContain('embed=1'); expect(location.hash).toContain('t=12');
@@ -686,6 +703,42 @@ it('browses both Explore shelves, opens exact details and restores the selected 
   expect(page()).toMatchObject({ explore: true, templates: true, template: null, templateCollection: 'builtin' });
 });
 
+it.each([
+  ['motion', 'motion'],
+  ['black-friday', 'explore'],
+  ['hub-gemini-4', 'model-hub'],
+  ['text-to-image', 'design'],
+])('uses the same Back to Explore control for the %s spotlight destination', async (slide, destination) => {
+  await mount();
+  await click('Explore');
+  const origin = location.href;
+  const feed = container.querySelector<HTMLElement>('.om-explore-host:not([hidden]) .om-explore')!;
+  const carousel = feed.querySelector('.om-feature-carousel')!;
+  const slides = [...carousel.querySelectorAll<HTMLElement>('.om-feature-slide')];
+  const segments = carousel.querySelectorAll<HTMLButtonElement>('.om-media-segments button');
+  await act(async () => segments[slides.findIndex(item => item.dataset.scene === slide)].click());
+  feed.scrollTop = 56;
+  await act(async () => carousel.querySelector<HTMLButtonElement>('.om-feature-slide:not([inert]) .om-discovery-hero-copy button')!.click());
+  expect(new URL(location.href).searchParams.get('page')).toBe(destination);
+  expect(breadcrumb()).toBeNull();
+  const returnControl = container.querySelector<HTMLButtonElement>('.om-back-to-explore');
+  expect(returnControl?.textContent).toBe('Back to Explore');
+  if (slide === 'text-to-image') {
+    const header = container.querySelector('.om-studio-bar')!;
+    expect(returnControl?.nextElementSibling).toBe(header.querySelector('h1'));
+    expect(header.querySelector('h1')?.textContent).toBe('Design Studio');
+    expect(header.querySelector('[aria-current="page"]')?.textContent).toBe('Text to image');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="Asset draft"]')?.value).toContain('Photograph an amber glass bottle');
+    const editTab = [...header.querySelectorAll<HTMLButtonElement>('nav button')].find(tab => tab.textContent === 'Image editing')!;
+    await act(async () => editTab.click());
+    expect(page().studio?.scene.id).toBe('image-edit');
+  }
+  await act(async () => { returnControl!.click(); await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(location.href).toBe(origin);
+  expect(carousel.getAttribute('data-scene')).toBe(slide);
+  expect(feed.scrollTop).toBe(56);
+});
+
 it('opens the Gemini 4 hub from the third Explore slide and returns with browser Back', async () => {
   await mount();
   await click('Explore');
@@ -923,17 +976,25 @@ it('opens Black Friday from the second Explore slide and reuses the native Skill
 it('carries a community template brief and an audio example into the matching studio without submitting generation', async () => {
   await mount(); await click('Search workspace'); await click('Product films');
   expect(page().community).toBe('product-films');
+  const collectionUrl = location.href;
   await click('Use this prompt');
   expect(page().studio?.scene.id).toBe('text-to-video');
   expect(container.querySelector<HTMLInputElement>('.om-creative-workspace input')?.value).toBe('A slow product reveal.');
-  await traverse(-1);
-  expect(page().community).toBe('product-films');
+  const videoTab = [...container.querySelectorAll<HTMLButtonElement>('.om-studio-bar .om-asset-tabs button')]
+    .find(node => node.textContent === 'Image to video')!;
+  await act(async () => videoTab.click());
+  expect(page().studio?.scene.id).toBe('image-to-video');
+  await returnThroughBreadcrumb('Product films');
+  expect(location.href).toBe(collectionUrl);
   await click('Explore');
+  const exploreUrl = location.href;
   const speechCard = container.querySelector<HTMLButtonElement>('.om-feed-group [data-scene="speech"]')!;
   expect(speechCard.querySelector('.om-feed-card-detail')?.textContent).toBe('Use this prompt');
   await act(async () => speechCard.click());
   expect(page().studio?.scene.id).toBe('speech');
   expect(container.querySelector<HTMLInputElement>('.om-creative-workspace input')?.value).toContain('Every idea deserves');
+  await returnThroughBreadcrumb('Explore');
+  expect(location.href).toBe(exploreUrl);
   expect(fetcher.mock.calls.some(([, options]) => options?.body && String(options.body).includes('"action":"generate"'))).toBe(false);
 });
 
@@ -1026,11 +1087,113 @@ it.each([
   await click(label);
   expect(page().studio).toMatchObject({ studio: { id: studio }, scene: { id: scene } });
   expect(page().studio?.landing).toBeUndefined();
+  expect(breadcrumb()).toBeNull();
+  expect(container.querySelector('.om-studio-bar [aria-label="Back to Explore"]')).toBeNull();
   expect(document.querySelector('.om-creative-menu')).toBeNull();
   expect(button(label).getAttribute('aria-current')).toBe('location');
   expect(button(label + ' · Scenes').getAttribute('aria-expanded')).toBe('false');
   await traverse(-1);
   expect(page().explore).toBe(true);
+});
+
+it.each([
+  ['Video', 'Text to video', 'text-to-video'],
+  ['Audio', 'Text to speech', 'speech'],
+])('opens the %s dropdown scene without a breadcrumb', async (label, sceneLabel, scene) => {
+  await mount(); await click('Explore');
+  await click(label + ' · Scenes');
+  const shortcut = [...document.querySelectorAll<HTMLButtonElement>('.om-creative-menu button')]
+    .find(node => node.querySelector('strong')?.textContent === sceneLabel)!;
+  await act(async () => shortcut.click());
+  expect(page().studio).toMatchObject({ landing: true, scene: { id: scene } });
+  expect(button('Back to Explore')).toBeUndefined();
+  expect(breadcrumb()).toBeNull();
+});
+
+it('returns from MCP client and setup tabs to Explore, and clears the source on a direct visit', async () => {
+  await mount(); await click('Explore');
+  const exploreUrl = location.href;
+  await click('MCP · Connect Agent');
+  expect(page().settings).toBe('mcp');
+  expect(button('Close settings')).toBeUndefined();
+  await click('Claude Code'); await click('Manual setup');
+  expect(breadcrumb()?.href).toBe(exploreUrl);
+  await mount(1);
+  await returnThroughBreadcrumb('Explore');
+  expect(location.href).toBe(exploreUrl);
+  await traverse(3);
+  expect(breadcrumb()?.href).toBe(exploreUrl);
+  const handbookUrl = location.href;
+  const entries = history.length;
+  await openMcp();
+  expect(location.href).toBe(handbookUrl);
+  expect(history.length).toBe(entries);
+  expect(breadcrumb()).toBeNull();
+  await click('Explore');
+  expect(page().explore).toBe(true);
+});
+
+it('returns from the settings connection action to the originating section', async () => {
+  await mount(); await accountAction('Settings');
+  const settingsUrl = location.href;
+  await click('Set up connection');
+  expect(page()).toMatchObject({ settings: 'mcp', mcpInSettings: true });
+  expect(container.querySelector('.om-settings-main .om-mcp-page')).not.toBeNull();
+  expect(breadcrumb()?.href).toBe(settingsUrl);
+  await returnThroughBreadcrumb('General');
+  expect(page().settings).toBe('general');
+});
+
+it('returns from the settings header to the exact source after changing sections and reloading', async () => {
+  history.replaceState(null, '', firstUrl.replace('#', '&page=explore&community=product-films#'));
+  await mount();
+  const exploreUrl = location.href;
+  await accountAction('Settings');
+  const generalUrl = location.href;
+  await click('Set up connection');
+  await click('Claude Code'); await click('Manual setup');
+  await mount(1);
+  expect(breadcrumb()?.href).toBe(generalUrl);
+  await leaveSettings();
+  expect(location.href).toBe(exploreUrl);
+  expect(page()).toMatchObject({ explore: true, community: 'product-films' });
+});
+
+it('keeps the settings sidebar mounted across MCP, agent and provider sections', async () => {
+  history.replaceState(null, '', firstUrl.replace('#', '&page=settings&section=local#'));
+  await mount();
+  const sidebar = container.querySelector('.om-settings-sections');
+  await click('MCP · Connect Agent');
+  expect(page()).toMatchObject({ settings: 'mcp', mcpInSettings: true });
+  expect(container.querySelector('.om-settings-sections')).toBe(sidebar);
+  expect(sidebar?.querySelector('[aria-current=page]')?.textContent).toBe('MCP · Connect Agent');
+  expect(container.querySelector('.om-settings-main .om-mcp-page')).not.toBeNull();
+  expect(button('MCP').getAttribute('aria-current')).toBeNull();
+  expect(settingsBack()).not.toBeNull();
+  expect(button('Close settings')).toBeUndefined();
+  expect(breadcrumb()).toBeNull();
+  await click('Claude Code'); await click('Manual setup');
+  const setupUrl = location.href;
+  expect(new URL(setupUrl).searchParams.get('page')).toBe('settings');
+  const providers = [...sidebar!.querySelectorAll<HTMLButtonElement>('button')].find(node => node.textContent === 'Model providers')!;
+  await act(async () => providers.click());
+  expect(page().settings).toBe('providers');
+  expect(container.querySelector('.om-settings-sections')).toBe(sidebar);
+  await traverse(-1);
+  expect(location.href).toBe(setupUrl);
+  expect(page()).toMatchObject({ client: 'claude', setup: 'manual', mcpInSettings: true });
+  await mount(1);
+  expect(container.querySelector('.om-settings-main a[download]')?.getAttribute('href')).toBe('/connect/config?host=claude');
+  await leaveSettings();
+  expect(page()).toMatchObject({ explore: true, settings: null });
+  await traverse(-1);
+  expect(location.href).toBe(setupUrl);
+  await openMcp();
+  expect(page()).toMatchObject({ settings: 'mcp', mcpInSettings: false });
+  expect(container.querySelector('.om-settings-sections')).toBeNull();
+  expect(settingsBack()).toBeNull();
+  expect(button('Close settings')).toBeUndefined();
+  expect(breadcrumb()).toBeNull();
 });
 
 it('retains the active model and scene on same-modality entry and switches a Cinema still to video', async () => {
@@ -1049,12 +1212,31 @@ it('opens image editing from its scene shortcut and returns to the same Explore 
   await act(async () => edit.click());
   expect(page()).toMatchObject({ community: 'product-films', studio: { landing: true, scene: { id: 'image-edit' } } });
   expect(container.querySelector('.om-studio-bar h1')?.textContent).toBe('Image editing');
+  expect(breadcrumb()).toBeNull();
+  expect(button('Back to Explore')).toBeUndefined();
+  const landing = location.href;
   await click('Open in Design Studio');
   expect(new URLSearchParams(location.search).get('page')).toBe('design');
-  await traverse(-1);
+  expect(page().studio?.scene.id).toBe('image-edit');
+  const sceneTab = [...container.querySelectorAll<HTMLButtonElement>('.om-studio-bar .om-asset-tabs button')]
+    .find(node => node.textContent === 'Text to image')!;
+  await act(async () => sceneTab.click());
+  expect(page().studio?.scene.id).toBe('text-to-image');
+  expect(breadcrumb()?.href).toBe(landing);
+  await returnThroughBreadcrumb('Image editing');
   expect(page().studio?.landing).toBe(true);
-  await clickWorkspaceBack();
+  expect(breadcrumb()).toBeNull();
+  await traverse(-1);
   expect(page()).toMatchObject({ explore: true, community: 'product-films' });
+  const collection = location.href;
+  const feed = container.querySelector<HTMLElement>('.om-explore')!;
+  feed.scrollTop = 320;
+  const imageExample = feed.querySelector<HTMLButtonElement>('button[data-scene="text-to-image"]')!;
+  await act(async () => imageExample.click());
+  expect(breadcrumb()?.href).toBe(collection);
+  await returnThroughBreadcrumb('Product films');
+  expect(location.href).toBe(collection);
+  expect(feed.scrollTop).toBe(320);
 });
 
 it('opens a technique from the full Explore skill index in its dedicated studio', async () => {
@@ -1083,7 +1265,7 @@ it.each([
   await click(title);
   await click(action);
   expect(page()).toMatchObject({ studio: { studio: { id }, scene: { id: scene } }, specialty: null, skill: null });
-  await clickWorkspaceBack();
+  await returnThroughBreadcrumb(title);
   expect(page()).toMatchObject({ specialty: { id }, studio: null, skill: null });
 });
 
@@ -1137,11 +1319,16 @@ it('opens model cases with a compatible provider and the same prompt from both d
   await traverse(-1);
   await choose(section(), 'header button');
   expect(page().modelOverview).toBe(image.id);
+  expect(breadcrumb()?.textContent).toBe('Explore');
   const overview = container.querySelectorAll('.om-explore-host:not([hidden]) .om-story-gallery .om-story-card');
   expect(overview).toHaveLength(2);
   await act(async () => (overview[0] as HTMLButtonElement).click());
   expect(page().studio?.model).toBe(image.id);
   expect(draft()).toBe(prompt);
+  await returnThroughBreadcrumb('Model details');
+  expect(page().modelOverview).toBe(image.id);
+  await returnThroughBreadcrumb('Explore');
+  expect(page().explore).toBe(true);
   expect(fetcher.mock.calls.some(([url, init]) => String(url).endsWith('/generations') && init?.method === 'POST')).toBe(false);
 });
 
@@ -1167,6 +1354,9 @@ it.each([
   await act(async () => cases[0].click());
   expect(page().studio?.model).toBe(model.id);
   expect(page().studio?.scene.label).toBe(label);
+  await returnThroughBreadcrumb('Model details');
+  expect(page().modelOverview).toBe(model.id);
+  expect(breadcrumb()).toBeNull();
 });
 
 it('keeps unlisted model briefs usable and links an Explore workflow to the Claude handbook example', async () => {
@@ -1180,6 +1370,7 @@ it('keeps unlisted model briefs usable and links an Explore workflow to the Clau
   const workflow = container.querySelector<HTMLButtonElement>('[aria-labelledby="explore-claude"] .om-story-card')!;
   await act(async () => workflow.click());
   expect(page()).toMatchObject({ settings: 'mcp', client: 'claude', mcpExample: 'anime-opening' });
+  expect(breadcrumb()?.textContent).toBe('Explore');
   expect(document.activeElement?.id).toBe('mcp-example-anime-opening');
   await mount(1);
   expect(document.activeElement?.id).toBe('mcp-example-anime-opening');
