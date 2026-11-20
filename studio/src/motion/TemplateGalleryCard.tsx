@@ -58,7 +58,7 @@ export function TemplatePoster({ template, eager = false, coverUrl, onCoverAspec
 }
 
 export const TemplateGalleryCard = memo(function TemplateGalleryCard({
-  template, onSelect, active, onPriority, playbackId, footer, brandCredit = false, resourceKind = 'template', animatedPreview, coverUrl, showAvatar = true,
+  template, onSelect, active, onPriority, playbackId, footer, brandCredit = false, resourceKind = 'template', animatedPreview, coverUrl, showAvatar = true, showCoverDuration = true,
 }: {
   template: GalleryTemplate;
   onSelect: (template: GalleryTemplate, trigger: HTMLButtonElement) => void;
@@ -71,6 +71,7 @@ export const TemplateGalleryCard = memo(function TemplateGalleryCard({
   animatedPreview?: string;
   coverUrl?: string;
   showAvatar?: boolean;
+  showCoverDuration?: boolean;
 }) {
   const { t } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
@@ -105,7 +106,7 @@ export const TemplateGalleryCard = memo(function TemplateGalleryCard({
       {template.previewUrl && <video ref={video} muted playsInline loop preload="none" aria-hidden="true" onPlaying={() => setPlaying(true)} onError={() => { setFailed(true); setPlaying(false); }} style={{ opacity: active && playing ? 1 : 0 }} />}
       {animatedPreview && active && animate && <iframe className="om-gallery-animation" src={animatedPreview} loading="lazy" sandbox="allow-scripts" title={template.title} tabIndex={-1} aria-hidden="true" />}
       <span className="om-gallery-card-shade" />
-      <span className="om-gallery-card-top">{resourceKind === 'brand-kit' && <span>{t('Brand Kit')}</span>}{resourceKind === 'template' && <span>{t(isEditableTemplate(template) ? 'Ready to edit' : template.styles?.[0] || 'Motion design')}</span>}{template.duration != null && <span>{t('{value}s', { value: Number(template.duration.toFixed(1)) })}</span>}</span>
+      <span className="om-gallery-card-top">{resourceKind === 'brand-kit' && <span>{t('Brand Kit')}</span>}{resourceKind === 'template' && <span>{t(isEditableTemplate(template) ? 'Ready to edit' : template.styles?.[0] || 'Motion design')}</span>}{showCoverDuration && template.duration != null && <span>{t('{value}s', { value: Number(template.duration.toFixed(1)) })}</span>}</span>
       {!linkedSource && <span className="om-gallery-card-bottom">
         {showAvatar && <TemplateIdentity template={template} brand={Boolean(brandName)} />}
         <span className="om-gallery-card-caption" data-brand-credit={brandName ? true : undefined}><strong>{brandName || template.title}</strong><small>{brandName ? template.title : credit}</small></span>
