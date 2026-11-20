@@ -229,11 +229,11 @@ export function CreativeNavigation({ specialty, onChooseStudio, destination, sou
       : (studio.id === 'design' && Boolean(designActive)) || (studio.id === 'cinema' && Boolean(cinemaActive))
         || (studio.id === destination?.studio.id && !destination?.landing && !destination?.mediaTab) || studio.id === specialty?.id;
     const badge = 'navBadge' in studio ? studio.navBadge : undefined;
-    const badgeId = badge ? navId + '-' + studio.id + (inPanel ? '-more' : '') : undefined;
+    const badgeId = badge && studio.id !== '3d' ? navId + '-' + studio.id + (inPanel ? '-more' : '') : undefined;
     return <Button variant="plain" className="om-nav-item" data-coming-soon={badge === 'Coming soon' || undefined} aria-current={isCurrent ? 'page' : undefined}
       aria-label={t(studio.title)} aria-describedby={badgeId} onClick={() => { track('nav_studio', { navTarget: studio.id, studio: studio.id, inOverflow: inPanel }); choose(() => onChooseStudio(studio)); }}>
       {inPanel && <span className="om-studio-heading-icon" data-tone={studioIconTone(studio)}><RemixIcon name={studio.icon} size={17} /></span>}
-      {t(studio.title)}{badge && <span className="om-badge" data-nav-badge={badge} id={badgeId} lang="en">{badge}</span>}
+      {t(studio.title)}{badgeId && <span className="om-badge" data-nav-badge={badge} id={badgeId} lang="en">{badge}</span>}
     </Button>;
   }
 
