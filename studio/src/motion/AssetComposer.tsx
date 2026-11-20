@@ -29,7 +29,7 @@ import { creationModels } from './creationModels';
 import { providerDisplayName } from './imageMenuModels';
 import { registeredProvider } from '../../../shared/provider-registry';
 
-export interface AssetDraft { modality: Modality; prompt: string; relight?: RelightChoices; videoChoices?: Record<string, string>; shotPreferences?: { aspect: string; duration?: number }; model?: string; parameters?: Record<string, unknown>; target?: { asset: LibraryAsset; versionId: string }; references: { reference: AssetReference; name: string }[] }
+export interface AssetDraft { modality: Modality; prompt: string; relight?: RelightChoices; videoChoices?: Record<string, string>; shotPreferences?: { aspect: string; duration?: number }; preferredModel?: string; model?: string; parameters?: Record<string, unknown>; target?: { asset: LibraryAsset; versionId: string }; references: { reference: AssetReference; name: string }[] }
 export function AssetComposer({ active, studio, draft, setDraft, agentReferences, setAgentReferences, jobs, mode, onMode, taskIds, history, selectingTask, onNew, onChatChanged, onChatStarted, onCancel, onView, onRetrySave, onResume, onReference, onUploadReference, onCreated, onError, onClose }: {
   active: boolean; studio?: StudioCreation; draft: AssetDraft; setDraft: Dispatch<SetStateAction<AssetDraft>>; jobs: GenerationJob[];
   agentReferences: AssetDraft['references']; setAgentReferences: (references: AssetDraft['references']) => void;
@@ -58,7 +58,9 @@ export function AssetComposer({ active, studio, draft, setDraft, agentReferences
   const [syncing, setSyncing] = useState(false);
   const selectedTask = history.tasks.find(task => task.key === history.selectedKey);
   const switching = busy || agentSending || selectingTask;
-  const { available, selected, choices, compatible, preferred } = creationModels(gateway, draft.modality, modelId, scene, featureMode, draft.references.length);
+  const { available, selected, choices, compatible, preferred } = creationModels(
+    gateway, draft.modality, modelId, scene, featureMode, draft.references.length, draft.preferredModel,
+  );
   const preferredProvider = preferred && gateway?.status.providers.find(provider => provider.id === preferred.provider);
   const unconfiguredPreferred = Boolean(studio && gateway && preferred && !selected && preferredProvider && !preferredProvider.available);
   const providerLabel = preferredProvider?.label ?? (preferred && registeredProvider(preferred.provider)?.label) ?? preferred?.provider ?? '';

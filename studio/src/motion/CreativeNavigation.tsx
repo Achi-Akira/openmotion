@@ -26,6 +26,7 @@ export type CreativeNavigationProps = {
   soundTab?: SoundTabId | null;
   motionActive: boolean;
   designActive?: boolean;
+  cinemaActive?: boolean;
   onNavigate: (destination: StudioDestination | null, seed?: ImageParameterSeed) => void;
   onNavigateSound?: (destination: StudioDestination, soundTab?: SoundTabId | null) => void;
   currentPage: 'explore' | 'mcp' | null;
@@ -87,7 +88,7 @@ function MediaChoices({ studio, destination, onNavigate, onSelectModel, catalog 
   </div>;
 }
 
-export function CreativeNavigation({ specialty, onChooseStudio, destination, soundTab, motionActive, designActive, onNavigate, onNavigateSound, currentPage, onOpenPage, overflowActions, trackingPage }: CreativeNavigationProps & { overflowActions?: (close: () => void) => ReactNode }) {
+export function CreativeNavigation({ specialty, onChooseStudio, destination, soundTab, motionActive, designActive, cinemaActive, onNavigate, onNavigateSound, currentPage, onOpenPage, overflowActions, trackingPage }: CreativeNavigationProps & { overflowActions?: (close: () => void) => ReactNode }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<Modality | 'mcp' | null>(null);
   const [popupHost, setPopupHost] = useState<HTMLElement>();
@@ -225,7 +226,8 @@ export function CreativeNavigation({ specialty, onChooseStudio, destination, sou
     if (index < studioStart) return splitItem(index, inPanel);
     const studio = creativeStudios[index - studioStart];
     const isCurrent = studio.surface === 'editor' ? motionActive
-      : (studio.id === 'design' && Boolean(designActive)) || (studio.id === destination?.studio.id && !destination?.landing && !destination?.mediaTab) || studio.id === specialty?.id;
+      : (studio.id === 'design' && Boolean(designActive)) || (studio.id === 'cinema' && Boolean(cinemaActive))
+        || (studio.id === destination?.studio.id && !destination?.landing && !destination?.mediaTab) || studio.id === specialty?.id;
     const badge = 'navBadge' in studio ? studio.navBadge : undefined;
     const badgeId = badge ? navId + '-' + studio.id + (inPanel ? '-more' : '') : undefined;
     return <Button variant="plain" className="om-nav-item" data-coming-soon={badge === 'Coming soon' || undefined} aria-current={isCurrent ? 'page' : undefined}

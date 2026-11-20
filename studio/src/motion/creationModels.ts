@@ -7,7 +7,7 @@ import { isOpenDesignProvider, menuRank, providerRank, providerReady, withOpenDe
 
 /** `openDesignOnly` serves feature entries: only OpenDesign models, with any other pinned model ignored.
  * With two or more references, models that accept fewer drop out (Seedream 5.5 rejects them with HTTP 400). */
-export function creationModels(gateway: Awaited<ReturnType<typeof loadGateway>> | undefined, modality: Modality, modelId?: string | null, scene?: StudioScene, openDesignOnly = false, referenceCount = 0) {
+export function creationModels(gateway: Awaited<ReturnType<typeof loadGateway>> | undefined, modality: Modality, modelId?: string | null, scene?: StudioScene, openDesignOnly = false, referenceCount = 0, templateModelId?: string) {
   const providers = gateway?.status.providers ?? [];
   // Studios offer the same fixed list as the navigation menus; ordinary Assets library creation retains every configured provider.
   const listed = (gateway ? (scene ? withOpenDesignModels(gateway.models, providers) : gateway.models).filter(model => model.modality === modality
@@ -25,7 +25,8 @@ export function creationModels(gateway: Awaited<ReturnType<typeof loadGateway>> 
   const recommendedId = feature ? imageFeatures[feature].recommended : videoFeature ? videoFeatures[videoFeature].recommended : undefined;
   const recommended = (models: typeof listed) => recommendedId ? models.find(model => model.modelId === recommendedId) : undefined;
   const preferred = pinned ?? (modelId && !openDesignOnly ? undefined
-    : recommended(available) ?? available.find(model => model.id === gateway?.status.routes[modality]) ?? available[0]
+    : available.find(model => model.modelId === templateModelId) ?? recommended(available)
+      ?? available.find(model => model.id === gateway?.status.routes[modality]) ?? available[0]
       ?? (scene ? recommended(compatible) ?? compatible[0] : undefined));
   const selected = available.find(model => model.id === preferred?.id);
   const choices = scene ? compatible : available;
