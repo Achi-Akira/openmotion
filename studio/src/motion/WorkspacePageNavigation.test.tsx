@@ -474,11 +474,34 @@ it('switches studios and restores a scene through history while retaining the ed
   expect(location.hash).toContain('t=12');
 });
 
-it('shows Motion templates without the projects sidebar and returns to the retained editor', async () => {
+it('opens the Template library directly from sidebar Motion templates and returns to the retained editor', async () => {
   await mount();
   const draft = container.querySelector<HTMLInputElement>('[aria-label="Editor draft"]')!;
   draft.value = 'Keep this edit';
   await click('Motion templates');
+  expect(page()).toMatchObject({ motion: false, templates: true, templateCollection: null });
+  expect(container.querySelector('#om-project-navigation')).toBeNull();
+  expect(button('Open project list')).toBeUndefined();
+  expect(container.querySelector('main[aria-label="Motion templates"] .om-discovery-hero')).toBeNull();
+  expect(container.querySelector('[data-workspace-gallery] .om-gallery-page-label')?.textContent).toBe('Template library');
+  const template = container.querySelector<HTMLButtonElement>('[data-workspace-gallery] [data-template-id="product-promo"] button')!;
+  await act(async () => template.click());
+  expect(page()).toMatchObject({ motion: false, templates: true, template: 'product-promo' });
+  await click('Close template preview');
+  await click('Close template library');
+  expect(page()).toMatchObject({ motion: false, templates: false, template: null });
+  expect(container.querySelector<HTMLElement>('.motion-workspace-content')?.hidden).toBe(false);
+  expect(container.querySelector('#om-project-navigation')?.getAttribute('aria-hidden')).toBe('false');
+  expect(container.querySelector('[aria-label="Editor draft"]')).toBe(draft);
+  expect(draft.value).toBe('Keep this edit');
+  expect(location.hash).toContain('t=12');
+});
+
+it('shows Motion Studio landing from the header, opens templates, and returns to the retained editor', async () => {
+  await mount();
+  const draft = container.querySelector<HTMLInputElement>('[aria-label="Editor draft"]')!;
+  draft.value = 'Keep this edit';
+  await click('Motion Studio');
   expect(page()).toMatchObject({ motion: true, templates: false });
   expect(container.querySelector('#om-project-navigation')).toBeNull();
   expect(button('Open project list')).toBeUndefined();
@@ -501,6 +524,21 @@ it('shows Motion templates without the projects sidebar and returns to the retai
   expect(container.querySelector('[aria-label="Editor draft"]')).toBe(draft);
   expect(draft.value).toBe('Keep this edit');
   expect(location.hash).toContain('t=12');
+});
+
+it('tracks active and expanded state on the sidebar All projects action while the dialog is open', async () => {
+  await mount();
+  const allProjects = button('All projects');
+  expect(allProjects.getAttribute('aria-expanded')).toBe('false');
+  expect(allProjects.getAttribute('data-active')).toBeNull();
+  await click('All projects');
+  expect(document.querySelector('[role=dialog]')?.textContent).toContain('All projects');
+  expect(allProjects.getAttribute('aria-expanded')).toBe('true');
+  expect(allProjects.getAttribute('data-active')).toBe('true');
+  await act(async () => document.querySelector<HTMLButtonElement>('[role=dialog] button[aria-label="Close"]')!.click());
+  expect(document.querySelector('[role=dialog]')).toBeNull();
+  expect(allProjects.getAttribute('aria-expanded')).toBe('false');
+  expect(allProjects.getAttribute('data-active')).toBeNull();
 });
 
 it('browses the complete Motion catalog in batches and filters by its existing tags', async () => {
@@ -673,7 +711,10 @@ it('shows mixed media in one Explore feed and opens templates and editing preset
   const sections = [...explore.querySelector('.om-explore-sections')!.children];
   expect(sections[0].classList.contains('om-explore-features')).toBe(true);
   expect(sections[0].querySelector('.om-featured-caption strong')?.textContent).toBe('Product Promo');
-  expect(sections[1].getAttribute('aria-labelledby')).toBe('explore-highlights');
+  expect(sections[1].getAttribute('aria-labelledby')).toBe('explore-workflows');
+  expect(sections[1].querySelector('#explore-workflows')?.textContent).toBe('Workflows');
+  expect(sections[1].querySelector('header button')?.textContent).toBe('All workflows');
+  expect(sections[2].getAttribute('aria-labelledby')).toBe('explore-highlights');
   const scenes = [...explore.querySelectorAll<HTMLElement>('.om-feed-group [data-scene]')];
   expect(scenes.map(card => card.dataset.scene)).toEqual(expect.arrayContaining(['image-edit', 'image-to-video', 'music', 'speech']));
   await click('Featured · Gemini 4 Neon');
@@ -847,7 +888,7 @@ it.each([
   const segments = carousel.querySelectorAll<HTMLButtonElement>('.om-media-segments button');
   await act(async () => segments[slides.findIndex(item => item.dataset.scene === slide)].click());
   feed.scrollTop = 56;
-  await act(async () => carousel.querySelector<HTMLButtonElement>('.om-feature-slide:not([inert]) .om-discovery-hero-copy button')!.click());
+  await act(async () => carousel.querySelector<HTMLButtonElement>('.om-feature-slide:not([inert]) [data-slide-action="destination"]')!.click());
   expect(new URL(location.href).searchParams.get('page')).toBe(destination);
   expect(breadcrumb()).toBeNull();
   const returnControl = container.querySelector<HTMLButtonElement>('.om-back-to-explore');
@@ -873,6 +914,43 @@ it.each([
   expect(location.href).toBe(origin);
   expect(carousel.getAttribute('data-scene')).toBe(slide);
   expect(feed.scrollTop).toBe(56);
+});
+
+it.each([
+  ['motion', 'motion-full-chain'],
+  ['black-friday', 'black-friday'],
+  ['hub-gemini-4', 'gemini-4-neon'],
+  ['text-to-image', 'design-full-chain'],
+  ['ai-influencer', 'ai-influencer'],
+] as const)('launches the %s workflow from the primary spotlight CTA and returns to Explore', async (slide, scenarioId) => {
+  await mount();
+  await click('Explore');
+  const origin = location.href;
+  const feed = container.querySelector<HTMLElement>('.om-explore-host:not([hidden]) .om-explore')!;
+  const carousel = feed.querySelector('.om-feature-carousel')!;
+  const slides = [...carousel.querySelectorAll<HTMLElement>('.om-feature-slide')];
+  const segments = carousel.querySelectorAll<HTMLButtonElement>('.om-media-segments button');
+  await act(async () => segments[slides.findIndex(item => item.dataset.scene === slide)].click());
+  feed.scrollTop = 64;
+  if (slide === 'ai-influencer') {
+    expect(carousel.querySelector('.om-feature-slide:not([inert]) [data-slide-action="destination"]')).toBeNull();
+  }
+  const primaryCta = carousel.querySelector<HTMLButtonElement>('.om-feature-slide:not([inert]) [data-slide-action="workflow"]')!;
+  expect(primaryCta.textContent).toBe('Start workflow');
+  await act(async () => primaryCta.click());
+  const params = new URL(location.href).searchParams;
+  expect(params.get('page')).toBe('scenario');
+  expect(params.get('scenario')).toBe(scenarioId);
+  expect(container.querySelector(`[data-scenario-workspace="${scenarioId}"]`)).not.toBeNull();
+  const returnControl = container.querySelector<HTMLButtonElement>('.om-back-to-explore');
+  if (returnControl) {
+    await act(async () => { returnControl.click(); await new Promise(resolve => setTimeout(resolve, 0)); });
+  } else {
+    await traverse(-1);
+  }
+  expect(location.href).toBe(origin);
+  expect(carousel.getAttribute('data-scene')).toBe(slide);
+  expect(feed.scrollTop).toBe(64);
 });
 
 it('opens the Gemini 4 hub from the third Explore slide and returns with browser Back', async () => {
@@ -1053,11 +1131,13 @@ it('rotates the visible Explore spotlight and plays visible Skill previews witho
     expect(hero.dataset.scene).toBe('hub-gemini-4');
     await act(async () => { vi.advanceTimersByTime(6000); });
     expect(hero.dataset.scene).toBe('text-to-image');
+    await act(async () => { vi.advanceTimersByTime(6000); });
+    expect(hero.dataset.scene).toBe('ai-influencer');
     act(() => { observed.get(hero)!(false); cards.forEach(card => observed.get(card)!(false)); });
     expect(hero.querySelector('video[src]')).toBeNull();
     for (const card of cards) expect(card.querySelector('video[src]')).toBeNull();
     act(() => { vi.advanceTimersByTime(6000); });
-    expect(hero.dataset.scene).toBe('text-to-image');
+    expect(hero.dataset.scene).toBe('ai-influencer');
     await act(async () => hero.querySelector<HTMLButtonElement>('.om-media-segments [aria-label="Featured · Motion Studio"]')!.click());
     expect(hero.dataset.scene).toBe('motion');
   } finally { vi.useRealTimers(); }
@@ -1231,9 +1311,9 @@ it('recovers community templates and opens the library from the community headin
   expect(container.querySelector('.om-feed-group [data-scene="music"]')).not.toBeNull();
   await click('Retry');
   expect(spotlight.querySelector('.om-featured-caption strong')?.textContent).toBe('first');
-  const sections = [...container.querySelector('.om-explore-sections')!.children].slice(0, 7);
+  const sections = [...container.querySelector('.om-explore-sections')!.children].slice(0, 8);
   expect(sections.map(section => section.getAttribute('aria-labelledby') ?? section.getAttribute('data-studio') ?? section.className))
-    .toEqual(['om-explore-features', 'explore-highlights', 'explore-claude', 'explore-community', 'explore-seedance', 'image', 'design']);
+    .toEqual(['om-explore-features', 'explore-workflows', 'explore-highlights', 'explore-claude', 'explore-community', 'explore-seedance', 'image', 'design']);
   for (const id of ['explore-seedance', 'explore-gpt-image']) {
     const heading = container.querySelector(`#${id}`)!;
     expect(heading.previousElementSibling).toBeNull();
@@ -1273,10 +1353,10 @@ it('lists each primary destination once in order, with the Image mega menu and t
   await mount();
   const nav = container.querySelector('.om-app-header nav.om-creative-navigation')!;
   const destinations = [...nav.querySelectorAll('button:not([aria-expanded]),a')].map(node => node.getAttribute('aria-label') ?? node.textContent?.trim());
-  expect(destinations).toEqual(['Explore', 'Image', 'Video', 'Audio', 'MCP', 'Design Studio', 'Motion Studio', 'Cinema Studio', 'Sound Studio', 'Shorts Studio', 'Marketing Studio', 'Explainer Studio', '3D Studio', 'Game Studio']);
+  expect(destinations).toEqual(['Explore', 'Workflows', 'Image', 'Video', 'Audio', 'MCP', 'Design Studio', 'Motion Studio', 'Cinema Studio', 'Sound Studio', 'Shorts Studio', 'Marketing Studio', 'Explainer Studio', '3D Studio', 'Game Studio']);
   const badges = [...nav.querySelectorAll('button[aria-describedby]')].map(node =>
     [node.getAttribute('aria-label'), document.getElementById(node.getAttribute('aria-describedby')!)?.textContent]);
-  expect(badges).toEqual([['Design Studio', 'New'], ['Motion Studio', 'Top'], ['Cinema Studio', 'Hot'], ['Game Studio', 'New']]);
+  expect(badges).toEqual([['Workflows', 'New'], ['Design Studio', 'New'], ['Motion Studio', 'Top'], ['Cinema Studio', 'Hot'], ['Game Studio', 'New']]);
   await click('Image · Scenes');
   const menu = document.querySelector('.om-creative-menu-image')!;
   expect([...menu.querySelectorAll('.om-media-mega-columns h2')].map(node => node.textContent)).toEqual(['Features', 'Models']);
@@ -1332,12 +1412,12 @@ it('localizes every top navigation Studio label in Chinese while keeping English
   await act(async () => root.render(<I18nProvider initialLocale="zh-CN"><MotionApp /></I18nProvider>));
   const nav = container.querySelector('.om-app-header nav.om-creative-navigation')!;
   const destinations = [...nav.querySelectorAll('button:not([aria-expanded]),a')].map(node => node.getAttribute('aria-label') ?? node.textContent?.trim());
-  expect(destinations).toEqual(['探索', '图片', '视频', '音频', 'MCP', '设计工作室', 'Motion 工作室', '影视工作室', '音频工作室', '短视频工作室', '营销工作室', '讲解视频工作室', '3D 工作室', '游戏工作室']);
+  expect(destinations).toEqual(['探索', '工作流', '图片', '视频', '音频', 'MCP', '设计工作室', 'Motion 工作室', '影视工作室', '音频工作室', '短视频工作室', '营销工作室', '讲解视频工作室', '3D 工作室', '游戏工作室']);
   const badges = [...nav.querySelectorAll('button[aria-describedby]')].map(node => {
     const badge = document.getElementById(node.getAttribute('aria-describedby')!);
     return [node.getAttribute('aria-label'), badge?.textContent, badge?.getAttribute('lang')];
   });
-  expect(badges).toEqual([['设计工作室', 'New', 'en'], ['Motion 工作室', 'Top', 'en'], ['影视工作室', 'Hot', 'en'], ['游戏工作室', 'New', 'en']]);
+  expect(badges).toEqual([['工作流', 'New', 'en'], ['设计工作室', 'New', 'en'], ['Motion 工作室', 'Top', 'en'], ['影视工作室', 'Hot', 'en'], ['游戏工作室', 'New', 'en']]);
 });
 
 it.each([

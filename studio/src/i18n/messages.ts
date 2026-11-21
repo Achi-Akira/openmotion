@@ -29,6 +29,7 @@ import soundStudioUi from './sound-studio-ui.json';
 import audioNavMenuUi from './audio-nav-menu-ui.json';
 import gameStudioUi from './game-studio-ui.json';
 import campaignUi from './campaign-ui.json';
+import scenarioUi from './scenario-ui.json';
 import ja from './ja.json';
 import ko from './ko.json';
 import de from './de.json';
@@ -59,7 +60,7 @@ export const isLocale = (value: unknown): value is Locale => languages.some(lang
 // supported language. Retained, unexposed advanced-editor strings still fall back.
 export const mvpMessages: Partial<Record<Locale, Record<string, Message>>> = { 'zh-CN': mvpZhCN, ...mvpUi };
 const uiMessages: Partial<Record<Locale, Record<string, Message>>>[] = [
-  componentInspectorUi, studioNavigationUi, reviewUi, assetNameUi, mvpMessages, errorUi, templateUi, templateSearchUi, settingsUi, mcpUi, assetsUi, skillsUi, skillLibraryUi, brandKitUi, projectUi, transcriptUi, exportRecoveryUi, importRecoveryUi, platformExportUi, canvasUi, fullscreenUi, timelineHoverUi, modelHubUi, designUi, designEditorUi, soundStudioUi, audioNavMenuUi, gameStudioUi, campaignUi,
+  componentInspectorUi, studioNavigationUi, reviewUi, assetNameUi, mvpMessages, errorUi, templateUi, templateSearchUi, settingsUi, mcpUi, assetsUi, skillsUi, skillLibraryUi, brandKitUi, projectUi, transcriptUi, exportRecoveryUi, importRecoveryUi, platformExportUi, canvasUi, fullscreenUi, timelineHoverUi, modelHubUi, designUi, designEditorUi, soundStudioUi, audioNavMenuUi, gameStudioUi, campaignUi, scenarioUi,
 ];
 const effectiveDictionaries: Record<string, Record<string, Message>> = Object.fromEntries(Object.entries(dictionaries).map(([locale, messages]) => {
   const localized = { ...messages };
