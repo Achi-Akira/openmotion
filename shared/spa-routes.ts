@@ -38,6 +38,7 @@ export const SPA_ROUTE_PREFIXES = [
   '/game',
   '/skills',
   '/models',
+  '/model-hub',
   '/assets',
   '/brand-kit',
   '/settings',
@@ -95,7 +96,9 @@ export function isStandaloneSpaPath(pathname: string, search = '', hash = ''): b
   const normalized = normalizePathname(pathname);
   if (normalized === '/') return isWorkspaceSettingsPage(search, hash);
   if (matchesPrefix(normalized, '/editor')) return false;
-  return STANDALONE_SPA_PREFIXES.some(prefix => matchesPrefix(normalized, prefix));
+  if (!STANDALONE_SPA_PREFIXES.some(prefix => matchesPrefix(normalized, prefix))) return false;
+  if (normalized === '/templates') return true;
+  return isWorkspaceSettingsPage(spaPathnameToSearch(normalized, search), hash);
 }
 
 /** Extract the project ID from `/editor/:projectId`, if present. */
@@ -172,8 +175,12 @@ export function spaPathnameToSearch(pathname: string, search = ''): string {
           if (!query.has('hub')) query.set('hub', third);
         } else if (second) {
           query.set('page', 'model');
-          if (!query.has('model')) query.set('model', second);
+          if (!query.has('model')) query.set('model', parts.slice(1).join('/'));
         }
+        break;
+      case 'model-hub':
+        query.set('page', 'model-hub');
+        if (second && !query.has('hub')) query.set('hub', second);
         break;
       case 'assets':
         query.set('page', 'assets');

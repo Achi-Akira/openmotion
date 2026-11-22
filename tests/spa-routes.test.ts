@@ -48,6 +48,8 @@ test('whitelisted SPA routes match while backend, missing asset, and source path
     '/skills',
     '/skills/kinetic-type',
     '/models/gemini-4.0',
+    '/models/fal%3Afal-ai%2Fsuno%2Fv4',
+    '/model-hub/gemini-4',
     '/models/hub/gemini-4',
     '/assets',
     '/assets/asset-1',
@@ -97,6 +99,10 @@ test('standalone SPA paths skip native Studio pre-launch while editor paths extr
   assert.equal(isStandaloneSpaPath('/design/prototype'), true);
   assert.equal(isStandaloneSpaPath('/settings/providers', '?project=project'), true);
   assert.equal(isStandaloneSpaPath('/mcp-setup', '?project=project'), true);
+  assert.equal(isStandaloneSpaPath('/model-hub/gemini-4', '?session=conversation'), true);
+  assert.equal(isStandaloneSpaPath('/models/veo-3', '?session=conversation'), true);
+  assert.equal(isStandaloneSpaPath('/model-hub', '?session=conversation'), false);
+  assert.equal(isStandaloneSpaPath('/models', '?session=conversation'), false);
   assert.equal(isStandaloneSpaPath('/', '?page=settings&section=providers'), true);
 
   assert.equal(isStandaloneSpaPath('/', '?project=project'), false);
@@ -110,8 +116,11 @@ test('spaPathnameToSearch maps semantic SPA pathnames to workspace query paramet
   assert.equal(spaPathnameToSearch('/cinema/text-to-video'), '?page=cinema&scene=text-to-video');
   assert.equal(spaPathnameToSearch('/design/projects/d-1'), '?page=design&scene=projects&designProject=d-1');
   assert.equal(spaPathnameToSearch('/mcp-setup/claude', '?setup=manual'), '?setup=manual&page=mcp&host=claude');
+  assert.equal(spaPathnameToSearch('/model-hub/gemini-4'), '?page=model-hub&hub=gemini-4');
   assert.equal(spaPathnameToSearch('/models/hub/gemini-4'), '?page=model-hub&hub=gemini-4');
   assert.equal(spaPathnameToSearch('/models/veo-3'), '?page=model&model=veo-3');
+  assert.equal(spaPathnameToSearch('/models/fal:fal-ai/suno/v4'), '?page=model&model=fal%3Afal-ai%2Fsuno%2Fv4');
+  assert.equal(spaPathnameToSearch('/models/fal%3Afal-ai%2Fsuno%2Fv4'), '?page=model&model=fal%3Afal-ai%2Fsuno%2Fv4');
   assert.equal(spaPathnameToSearch('/sound'), '?page=sound&home=1');
   assert.equal(spaPathnameToSearch('/sound/speech'), '?page=sound&scene=speech');
   assert.equal(spaPathnameToSearch('/templates'), '?templates=1');
