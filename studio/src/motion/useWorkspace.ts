@@ -27,7 +27,14 @@ export function navigateWorkspace(url: string, replace = false) {
 }
 const jsonBody = (body: unknown) => ({ headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-export function useWorkspace(waitForSaves: () => Promise<void>, projectId?: string, sessionId?: string, navigate = navigateWorkspace) {
+export function useWorkspace(
+  waitForSaves: () => Promise<void>,
+  projectId?: string,
+  sessionId?: string,
+  navigate = navigateWorkspace,
+  options?: { externalHistoryGuard?: boolean },
+) {
+  const externalHistoryGuard = Boolean(options?.externalHistoryGuard);
   const { t } = useI18n();
   const [projects, setProjects] = useState<SavedProject[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
@@ -66,7 +73,7 @@ export function useWorkspace(waitForSaves: () => Promise<void>, projectId?: stri
     setSessions(previous => JSON.stringify(previous) === JSON.stringify(nextSessions) ? previous : nextSessions);
   }, []);
   useEffect(() => {
-    if (navigate === navigateWorkspace) return;
+    if (navigate === navigateWorkspace || externalHistoryGuard) return;
     initializeWorkspaceHistory();
     let previousUrl = location.href, previousIndex = workspaceHistoryIndex(), previousSession = workspaceHistorySession();
     let cancelled = false, generation = 0;
@@ -83,7 +90,7 @@ export function useWorkspace(waitForSaves: () => Promise<void>, projectId?: stri
       const sameProject = requestedProject(next.search, next.hash) === requestedProject(previous.search, previous.hash)
         && next.searchParams.get('session') === previous.searchParams.get('session');
       try {
-        if (acting.current) throw new Error('正在切换项目，请稍后重试。');
+        if (acting.current) throw new Error(t('Switching projects. Please try again shortly.'));
         // Page switches preserve the mounted editor. Leaving a busy template
         // library or replacing the project still uses the existing save guard.
         if (!sameProject || (readWorkspacePage(previous.search, previous.hash).templates && !readWorkspacePage(next.search, next.hash).templates)) await waitForSaves();
@@ -106,7 +113,7 @@ export function useWorkspace(waitForSaves: () => Promise<void>, projectId?: stri
     window.addEventListener(WORKSPACE_LOCATION_CHANGED, accepted);
     window.addEventListener('popstate', restore);
     return () => { cancelled = true; window.removeEventListener(WORKSPACE_LOCATION_CHANGED, accepted); window.removeEventListener('popstate', restore); };
-  }, [navigate, projectId, sessionId, waitForSaves]);
+  }, [navigate, projectId, sessionId, waitForSaves, externalHistoryGuard]);
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -197,5 +204,5 @@ export function useWorkspace(waitForSaves: () => Promise<void>, projectId?: stri
   const rename = useCallback((id: string, title: string) => renameItem(id, title, 'projects'), [renameItem]);
   const renameSession = useCallback((id: string, title: string) => renameItem(id, title, 'sessions'), [renameItem]);
   const clearError = useCallback(() => { setError(''); }, []);
-  return { projects: displayedProjects.filter(project => !project.trashedAt), activeProjectId, trashedProjects: displayedProjects.filter(project => Boolean(project.trashedAt)), sessions: visibleSessions, session: visibleSessions.find(item => item.id === sessionId), status, busy, navigationError, connectionError, error: error || connectionError, errorSource: error ? 'operation' as const : 'connection' as const, checkingConnection, retryConnection, open, followActiveProject, create, home, rename, startSession, openSession, createArtifact, renameSession, clearError };
+  return { projects: displayedProjects.filter(project => !project.trashedAt), activeProjectId, trashedProjects: displayedProjects.filter(project => Boolean(project.trashedAt)), sessions: visibleSessions, session: visibleSessions.find(item => item.id === sessionId), status, busy, actingRef: acting, navigationError, connectionError, error: error || connectionError, errorSource: error ? 'operation' as const : 'connection' as const, checkingConnection, retryConnection, open, followActiveProject, create, home, rename, startSession, openSession, createArtifact, renameSession, clearError };
 }

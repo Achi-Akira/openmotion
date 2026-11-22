@@ -91,6 +91,31 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); history.replaceState(null, '', '/'); });
 
+it('cold-loads whitelisted semantic SPA path URLs directly into the requested surface', async () => {
+  history.replaceState(null, '', '/settings/providers');
+  await mount(0);
+  expect(container.querySelector('.om-provider-settings')).not.toBeNull();
+  expect(container.querySelector('.om-settings-sections [aria-current=page]')?.textContent).toContain('Model providers');
+  expect(container.querySelector('.om-explore-host')).toBeNull();
+
+  history.replaceState(null, '', '/assets');
+  await mount(1);
+  expect(container.querySelector<HTMLElement>('.om-assets-host')?.hidden).toBe(false);
+  expect(container.querySelector('[aria-label="Asset draft"]')).not.toBeNull();
+
+  history.replaceState(null, '', '/motion');
+  await mount(2);
+  expect(container.querySelector('main[aria-label="Motion templates"]')).not.toBeNull();
+
+  history.replaceState(null, '', '/mcp-setup/claude');
+  await mount(3);
+  expect(container.querySelector('#mcp-title')?.textContent).toContain('Claude Code');
+
+  history.replaceState(null, '', `/editor/${second}`);
+  await mount(4);
+  expect(container.querySelector('[data-project]')?.getAttribute('data-project')).toBe(second);
+});
+
 it.each(settingsSections)('restores a copied %s page on a fresh mount', async section => {
   const query = section === 'mcp' ? 'page=mcp&host=claude&setup=manual' : `page=settings&section=${section}`;
   history.replaceState(null, '', firstUrl.replace('#', `&${query}#`));
@@ -380,12 +405,16 @@ it('opens settings without starting the retained project and resolves it only on
 });
 
 it('ignores an older pending history navigation after the user returns to the current project', async () => {
-  await mount(); await click('Second project');
+  await mount(); await click('Second project'); await openMcp(); await traverse(-1);
   let finish!: () => void;
   editor.wait = () => new Promise(resolve => { finish = resolve; });
   await traverse(-1);
+  expect(new URLSearchParams(location.search).get('project')).toBe(second);
   expect(container.querySelector('[data-project]')?.getAttribute('data-project')).toBe(second);
+  // While the blocked Back save flush is pending, navigating to another page on the
+  // current project and returning supersedes the older pending navigation.
   await traverse(1);
+  await traverse(-1);
   await act(async () => finish());
   expect(new URLSearchParams(location.search).get('project')).toBe(second);
   expect(container.querySelector('[data-project]')?.getAttribute('data-project')).toBe(second);
