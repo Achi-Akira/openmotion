@@ -1,0 +1,9 @@
+{
+  "name": "openmotion",
+  "version": "1.0.0",
+  "description": "Plan, create, animate, edit, preview and export motion graphics and motion videos with OpenMotion: original videos from a brief, template-based videos, reference-video recreation, reusable templates, media generation and playable browser games. The skills set up the local Studio and MCP connection when it's missing.",
+  "homepage": "https://github.com/nexu-io/openmotion",
+  "repository": "https://github.com/Achi-Akira/openmotion",
+  "license": "Apache-2.0",
+  "keywords": ["motion-graphics", "video", "templates", "animation", "export", "mcp"]
+}
